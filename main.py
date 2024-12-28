@@ -19,13 +19,6 @@ def get_args():
         default="BTC_Data.csv"
     )
     
-    parser.add_argument(
-        "--danger",
-        type=int,
-        default=1,
-        choices=[0, 1, 2, 3]
-    )
-    
     return parser.parse_args()
 
 if __name__ == "__main__":
@@ -35,8 +28,7 @@ if __name__ == "__main__":
         exchange = OfflineExchange(args.file_path)
         
     agent = AutoTradingAgent(
-        exchange=exchange,
-        danger=args.danger
+        exchange=exchange
     )
     
     agent.run()

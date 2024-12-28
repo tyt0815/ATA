@@ -6,6 +6,7 @@ import os
 import pandas as pd
 import sys
 
+from ata.algorithm import trading
 from ata.exchange.baseexchange import BaseExchange
 
 class AutoTradingAgent:
@@ -13,15 +14,11 @@ class AutoTradingAgent:
         self,
         exchange:BaseExchange,
         targets: list=["BTC", "ETH", "DOGE"],
-        window_size=20,
-        end_condition=0.3,
-        danger=2
+        end_condition=0.3
         ):
         
         self.exchange = exchange
-        self.window_size = window_size
         self.targets = targets
-        self.danger = danger
         
         self.end_condition = self.exchange.get_balance() * (1 - end_condition)
         
@@ -73,8 +70,10 @@ class AutoTradingAgent:
                     _, sell_price = self.exchange.sell(coin=current_target)
                     sell_index = len(self.price_history) - 1
                     break
+                
+            # 시각화
             if t > 0:
-                offset = 500
+                offset = 200
                 start = max(prev_buy_index - offset, 0)
                 end = min(prev_sell_index + offset, len(self.prev_price_history))
                 
@@ -119,99 +118,52 @@ class AutoTradingAgent:
             
         
     def _is_buy_timing(self, coin):
-    
-        ohlcv = self.exchange.get_ohlcv(coin=coin, length=self.window_size)
-        bollinger_band = self.calc_bollinger_bands(prices=ohlcv["close"])
+        ohlcv_per_1m = self.exchange.get_ohlcv_per_1m(coin=coin)
         
-        self.prev_price_history.append(ohlcv["close"].iloc[-1])
-        self.prev_moving_avg_history.append(bollinger_band["moving_avg"].iloc[-1])
-        self.prev_upper_band_history.append(bollinger_band["upper_band"].iloc[-1])
-        self.prev_lower_band_history.append(bollinger_band["lower_band"].iloc[-1])
+        bollinger_band_per_1m = trading.calc_bollinger_bands(prices=ohlcv_per_1m["close"], window_size=20)
         
-        self.price_history.append(ohlcv["close"].iloc[-1])
-        self.moving_avg_history.append(bollinger_band["moving_avg"].iloc[-1])
-        self.upper_band_history.append(bollinger_band["upper_band"].iloc[-1])
-        self.lower_band_history.append(bollinger_band["lower_band"].iloc[-1])
+        # 차트
+        self.prev_price_history.append(ohlcv_per_1m["close"].iloc[-1])
+        self.prev_moving_avg_history.append(bollinger_band_per_1m["moving_avg"].iloc[-1])
+        self.prev_upper_band_history.append(bollinger_band_per_1m["upper_band"].iloc[-1])
+        self.prev_lower_band_history.append(bollinger_band_per_1m["lower_band"].iloc[-1])
         
-        if bollinger_band["lower_band"].iloc[-1] < ohlcv["close"].iloc[-1]:
+        self.price_history.append(ohlcv_per_1m["close"].iloc[-1])
+        self.moving_avg_history.append(bollinger_band_per_1m["moving_avg"].iloc[-1])
+        self.upper_band_history.append(bollinger_band_per_1m["upper_band"].iloc[-1])
+        self.lower_band_history.append(bollinger_band_per_1m["lower_band"].iloc[-1])
+        
+        # 가격이 볼린저 밴드 하단을 터이하였는가
+        if bollinger_band_per_1m["lower_band"].iloc[-1] < ohlcv_per_1m["close"].iloc[-1]:
             return False
-        if bollinger_band["b"].iloc[-1] > 0:
+        
+        # 볼린저 %b가 0이하인가
+        if bollinger_band_per_1m["b"].iloc[-1] > 0:
             return False
         
-        rvol = self.exchange.calc_rvol(coin=coin)
-        if self.danger > 1 or (self.danger == 0 and rvol.iloc[-1] < 1):
-            return True
-        
-        mfi = self.calc_mfi(ohlcv=ohlcv)
-        if mfi.iloc[-1] > 20:
+        # mfi가 20이하인가
+        mfi_per_1m = trading.calc_mfi(ohlcv=ohlcv_per_1m)
+        if mfi_per_1m.iloc[-1] > 20:
             return False
         
         return True
     
     def _is_sell_timing(self, coin):
-        ohlcv = self.exchange.get_ohlcv(coin=coin, length=self.window_size)
-        bollinger_band = self.calc_bollinger_bands(prices=ohlcv["close"])
+        ohlcv_per_1m = self.exchange.get_ohlcv_per_1m(coin=coin)
+        bollinger_band_per_1m = trading.calc_bollinger_bands(prices=ohlcv_per_1m["close"],window_size=20)
         
-        self.price_history.append(ohlcv["close"].iloc[-1])
-        self.moving_avg_history.append(bollinger_band["moving_avg"].iloc[-1])
-        self.upper_band_history.append(bollinger_band["upper_band"].iloc[-1])
-        self.lower_band_history.append(bollinger_band["lower_band"].iloc[-1])
+        self.price_history.append(ohlcv_per_1m["close"].iloc[-1])
+        self.moving_avg_history.append(bollinger_band_per_1m["moving_avg"].iloc[-1])
+        self.upper_band_history.append(bollinger_band_per_1m["upper_band"].iloc[-1])
+        self.lower_band_history.append(bollinger_band_per_1m["lower_band"].iloc[-1])
         
-        if bollinger_band["upper_band"].iloc[-1] > ohlcv["close"].iloc[-1]:
+        if bollinger_band_per_1m["upper_band"].iloc[-1] > ohlcv_per_1m["close"].iloc[-1]:
             return False
-        if bollinger_band["b"].iloc[-1] < 1:
+        if bollinger_band_per_1m["b"].iloc[-1] < 1:
             return False
         
-        rvol = self.exchange.calc_rvol(coin=coin)
-        if self.danger < 3 or (self.danger == 0 and rvol.iloc[-1] < 1):
-            return True
-        
-        mfi = self.calc_mfi(ohlcv=ohlcv)
-        if mfi.iloc[-1] < 80:
+        mfi_per_1m = trading.calc_mfi(ohlcv=ohlcv_per_1m)
+        if mfi_per_1m.iloc[-1] < 80:
             return False
         
         return True
-    
-    def calc_bollinger_bands(self, prices):
-        # 이동평균 계산
-        rolling_mean = prices.rolling(window=self.window_size).mean()
-        
-        # 표준편차 계산
-        rolling_std = prices.rolling(window=self.window_size).std()
-        
-        # 상단 밴드와 하단 밴드 계산
-        upper_band = rolling_mean + (rolling_std * 2)
-        lower_band = rolling_mean - (rolling_std * 2)
-        
-        # 볼린저 %b 계산
-        bollinger_b = (prices - lower_band) / (upper_band - lower_band)
-        
-        # 결과를 데이터프레임으로 반환
-        return pd.DataFrame({
-            'moving_avg': rolling_mean,
-            'upper_band': upper_band,
-            'lower_band': lower_band,
-            "b": bollinger_b
-        })
-    
-    def calc_mfi(self, ohlcv, period=14):
-         # Typical Price 계산
-        typical_price = (ohlcv['high'] + ohlcv['low'] + ohlcv['close']) / 3
-        
-        # Raw Money Flow 계산
-        raw_money_flow = typical_price * ohlcv['volume']
-        
-        # Positive/Negative Money Flow 구분
-        price_change = typical_price.diff()
-        positive_money_flow = np.where(price_change > 0, raw_money_flow, 0)
-        negative_money_flow = np.where(price_change < 0, raw_money_flow, 0)
-        
-        # Rolling sums for the given period
-        positive_mf_sum = pd.Series(positive_money_flow).rolling(window=period).sum()
-        negative_mf_sum = pd.Series(negative_money_flow).rolling(window=period).sum()
-        
-        # Money Flow Ratio and MFI 계산
-        money_flow_ratio = positive_mf_sum / negative_mf_sum
-        mfi = 100 - (100 / (1 + money_flow_ratio))
-        
-        return mfi

@@ -16,18 +16,38 @@ class OfflineExchange(BaseExchange):
             print(f"Data file read error: {e}")
             quit()
         
-        self.idx = -1
         self.krw = balance
         self.coin = 0
         self.buying_amount = 0
+        self.ohlcv_per_1m = None
+        self.ohlcv_per_15m = None
     
-        for i in range(100):
-            assert self.update(), f"error: not enough offline data {i}"
+        offset = 300
+        assert offset <= len(self.data), f"error: not enough offline data ({offset} {len(self.data)})"
+        self.idx = offset - 2
+        self.update()
     
     def update(self) -> bool:
         self.idx += 1
         if len(self.data) <= self.idx:
             return False
+        
+        self.ohlcv_per_1m = self.data[max(self.idx + 1 - 20, 0):self.idx + 1]
+        columns_to_resample = ['open', 'high', 'low', 'close', 'volume']
+        
+        temp_data = self.data[columns_to_resample].iloc[max(self.idx + 1 - 300, 0):self.idx + 1]
+        group = temp_data.index // 15
+        self.ohlcv_per_15m = (
+            temp_data
+            .groupby(group)
+            .agg({
+                'open': 'first',
+                'high': 'max',
+                'low': 'min',
+                'close': 'last',
+                'volume': 'sum'
+        }).reset_index(drop=True))  # 그룹 컬럼 제거
+        
         return True
     
     def buy(self, coin):
@@ -47,19 +67,14 @@ class OfflineExchange(BaseExchange):
         self.buying_amount = 0
         return selling_amount, curr_price
     
-    def get_ohlcv(self, coin, length):
-        return self.data[max(self.idx + 1 - length, 0):self.idx + 1]
+    def get_ohlcv_per_1m(self, coin):
+        return self.ohlcv_per_1m
+    
+    def get_ohlcv_per_15m(self, coin):
+        return self.ohlcv_per_15m
     
     def get_current_price(self, coin):
         return self.data["close"].iloc[self.idx]
     
     def get_balance(self):
         return self.krw + self.coin * self.get_current_price(coin="")
-    
-    def calc_rvol(self, coin, window=10):
-        ohlcv = self.get_ohlcv(coin=coin, length=window)
-        rolling_mean = ohlcv['volume'].rolling(window=window).mean()
-
-        # 현재 거래량(baseVolume)과 평균 거래량(rolling_mean) 비교
-        rvol = ohlcv['volume'] / rolling_mean
-        return rvol

@@ -25,7 +25,11 @@ class BaseExchange:
         pass
     
     @abstractmethod
-    def get_ohlcv(self, coin, length):
+    def get_ohlcv_per_1m(self, coin):
+        pass
+    
+    @abstractmethod
+    def get_ohlcv_per_15m(self, coin):
         pass
     
     @abstractmethod
@@ -34,7 +38,4 @@ class BaseExchange:
     
     @abstractmethod
     def get_balance(self):
-        pass
-    @abstractmethod
-    def calc_rvol(self, coin):
         pass
