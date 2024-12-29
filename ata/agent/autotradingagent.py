@@ -39,7 +39,7 @@ class AutoTradingAgent:
         
         for t in count():
             current_target = None
-            plt.figure(figsize=(25, 6))
+            plt.figure(figsize=(30, 6))
             
             self.price_history = []
             self.moving_avg_history = []
@@ -47,13 +47,13 @@ class AutoTradingAgent:
             self.lower_band_history = []
             
             b_buy = False
-            # 매수 루프
+            # 매수 루프            
             while True:
                 if self.exchange.update() == False:
                     return
                 for coin in self.targets:
                     if self._is_buy_timing(coin=coin):
-                        _, buy_price = self.exchange.buy(coin=coin)
+                        _, buy_price = self.exchange.buy(coin=coin, amount_krw=self.exchange.krw)
                         buy_index = len(self.price_history) - 1
                         b_buy = True
                         current_target = coin
@@ -67,7 +67,7 @@ class AutoTradingAgent:
                 if self.exchange.update() == False:
                     return
                 if self._is_sell_timing(coin=current_target):
-                    _, sell_price = self.exchange.sell(coin=current_target)
+                    _, sell_price = self.exchange.sell(coin=current_target, amount_krw=self.exchange.get_balance())
                     sell_index = len(self.price_history) - 1
                     break
                 
@@ -106,6 +106,7 @@ class AutoTradingAgent:
                 plt.legend()
                 plt.grid()
                 plt.savefig(os.path.join(file_path, f"{t}.png"))
+            plt.close()
             
             self.prev_price_history = self.price_history
             self.prev_moving_avg_history = self.moving_avg_history
@@ -118,52 +119,106 @@ class AutoTradingAgent:
             
         
     def _is_buy_timing(self, coin):
-        ohlcv_per_1m = self.exchange.get_ohlcv_per_1m(coin=coin)
+        # per 1m
+        df_per_1m = self.exchange.get_ohlcv_per_1m(coin=coin)
         
-        bollinger_band_per_1m = trading.calc_bollinger_bands(prices=ohlcv_per_1m["close"], window_size=20)
+        # 볼린저
+        bollinger_period = 20
+        bollinger_num_std_dev = 2
+        df_per_1m = trading.calc_bollinger_bands(df=df_per_1m, period=bollinger_period, num_std_dev=bollinger_num_std_dev)
         
         # 차트
-        self.prev_price_history.append(ohlcv_per_1m["close"].iloc[-1])
-        self.prev_moving_avg_history.append(bollinger_band_per_1m["moving_avg"].iloc[-1])
-        self.prev_upper_band_history.append(bollinger_band_per_1m["upper_band"].iloc[-1])
-        self.prev_lower_band_history.append(bollinger_band_per_1m["lower_band"].iloc[-1])
+        self.prev_price_history.append(df_per_1m["close"].iloc[-1])
+        self.prev_moving_avg_history.append(df_per_1m[f"sma{bollinger_period}"].iloc[-1])
+        self.prev_upper_band_history.append(df_per_1m[f"upper_band{bollinger_period}_{bollinger_num_std_dev}"].iloc[-1])
+        self.prev_lower_band_history.append(df_per_1m[f"lower_band{bollinger_period}_{bollinger_num_std_dev}"].iloc[-1])
         
-        self.price_history.append(ohlcv_per_1m["close"].iloc[-1])
-        self.moving_avg_history.append(bollinger_band_per_1m["moving_avg"].iloc[-1])
-        self.upper_band_history.append(bollinger_band_per_1m["upper_band"].iloc[-1])
-        self.lower_band_history.append(bollinger_band_per_1m["lower_band"].iloc[-1])
+        self.price_history.append(df_per_1m["close"].iloc[-1])
+        self.moving_avg_history.append(df_per_1m[f"sma{bollinger_period}"].iloc[-1])
+        self.upper_band_history.append(df_per_1m[f"upper_band{bollinger_period}_{bollinger_num_std_dev}"].iloc[-1])
+        self.lower_band_history.append(df_per_1m[f"lower_band{bollinger_period}_{bollinger_num_std_dev}"].iloc[-1])
         
-        # 가격이 볼린저 밴드 하단을 터이하였는가
-        if bollinger_band_per_1m["lower_band"].iloc[-1] < ohlcv_per_1m["close"].iloc[-1]:
+        # 가격이 볼린저 밴드 하단을 터치치하였는가
+        if df_per_1m[f"lower_band{bollinger_period}_{bollinger_num_std_dev}"].iloc[-1] < df_per_1m["close"].iloc[-1]:
             return False
         
         # 볼린저 %b가 0이하인가
-        if bollinger_band_per_1m["b"].iloc[-1] > 0:
+        if df_per_1m[f"bollinger_b{bollinger_period}_{bollinger_num_std_dev}"].iloc[-1] > 0:
             return False
         
         # mfi가 20이하인가
-        mfi_per_1m = trading.calc_mfi(ohlcv=ohlcv_per_1m)
-        if mfi_per_1m.iloc[-1] > 20:
+        mfi_peirod = 14
+        df_per_1m = trading.calc_mfi(df=df_per_1m, period=mfi_peirod)
+        if df_per_1m[f'mfi{mfi_peirod}'].iloc[-1] > 20:
             return False
+        
+        # # per 15m
+        # df_per_15m = self.exchange.get_ohlcv_per_15m(coin=coin)
+        # # ema120 > ema20 > ema1(주가)인가
+        # df_per_15m = trading.calc_ema(df_per_15m, 20)
+        # df_per_15m = trading.calc_ema(df_per_15m, 120)
+        # if not(df_per_15m['ema120'].iloc[-1] > df_per_15m['ema20'].iloc[-1] and df_per_15m['ema20'].iloc[-1] > df_per_15m["close"].iloc[-1]):
+        #     return False
+        
+        # # 이격도가 아래 4선에 도달했는가
+        # df_per_15m = trading.calc_deviation_from_sma(df_per_15m, 120)
+        # if min(df_per_15m['deviation_sma120']) >= 0:
+        #     return False
+        
+        # # 윌리엄스 %R이 하단을 이탈하였는가
+        # williams_period = 10
+        # df_per_15m = trading.calc_williams_r(df_per_15m, williams_period)
+        # if df_per_15m[f'williams_r{williams_period}'].iloc[-1] > -90:
+        #     return False
         
         return True
     
     def _is_sell_timing(self, coin):
-        ohlcv_per_1m = self.exchange.get_ohlcv_per_1m(coin=coin)
-        bollinger_band_per_1m = trading.calc_bollinger_bands(prices=ohlcv_per_1m["close"],window_size=20)
+        # per 1m
+        df_per_1m = self.exchange.get_ohlcv_per_1m(coin=coin)
         
-        self.price_history.append(ohlcv_per_1m["close"].iloc[-1])
-        self.moving_avg_history.append(bollinger_band_per_1m["moving_avg"].iloc[-1])
-        self.upper_band_history.append(bollinger_band_per_1m["upper_band"].iloc[-1])
-        self.lower_band_history.append(bollinger_band_per_1m["lower_band"].iloc[-1])
+        # 볼린저
+        bollinger_period = 20
+        bollinger_num_std_dev = 2
+        df_per_1m = trading.calc_bollinger_bands(df=df_per_1m, period=bollinger_period, num_std_dev=bollinger_num_std_dev)
         
-        if bollinger_band_per_1m["upper_band"].iloc[-1] > ohlcv_per_1m["close"].iloc[-1]:
-            return False
-        if bollinger_band_per_1m["b"].iloc[-1] < 1:
+        # 차트
+        self.price_history.append(df_per_1m["close"].iloc[-1])
+        self.moving_avg_history.append(df_per_1m[f"sma{bollinger_period}"].iloc[-1])
+        self.upper_band_history.append(df_per_1m[f"upper_band{bollinger_period}_{bollinger_num_std_dev}"].iloc[-1])
+        self.lower_band_history.append(df_per_1m[f"lower_band{bollinger_period}_{bollinger_num_std_dev}"].iloc[-1])
+        
+        # 가격이 볼린저 밴드 상단을 터치하였는가
+        if df_per_1m[f"upper_band{bollinger_period}_{bollinger_num_std_dev}"].iloc[-1] > df_per_1m["close"].iloc[-1]:
             return False
         
-        mfi_per_1m = trading.calc_mfi(ohlcv=ohlcv_per_1m)
-        if mfi_per_1m.iloc[-1] < 80:
+        # 볼린저 %b가 1이상인가
+        if df_per_1m[f"bollinger_b{bollinger_period}_{bollinger_num_std_dev}"].iloc[-1] < 1:
             return False
+        
+        # mfi가 80이상인가
+        mfi_peirod = 14
+        df_per_1m = trading.calc_mfi(df=df_per_1m, period=mfi_peirod)
+        if df_per_1m[f'mfi{mfi_peirod}'].iloc[-1] < 80:
+            return False
+        
+        # # per 15m
+        # df_per_15m = self.exchange.get_ohlcv_per_15m(coin=coin)
+        # # ema120 < ema20 < ema1(주가)인가
+        # df_per_15m = trading.calc_ema(df_per_15m, 20)
+        # df_per_15m = trading.calc_ema(df_per_15m, 120)
+        # if not (df_per_15m['ema120'].iloc[-1] < df_per_15m['ema20'].iloc[-1] and df_per_15m['ema20'].iloc[-1] < df_per_15m["close"].iloc[-1]):
+        #     return False
+        
+        # # 이격도가 위 4선에 도달했는가
+        # df_per_15m = trading.calc_deviation_from_sma(df_per_15m, 120)
+        # if min(df_per_15m['deviation_sma120']) <= 0:
+        #     return False
+        
+        # # 윌리엄스 %R이 상단단을 이탈하였는가
+        # williams_period = 10
+        # df_per_15m = trading.calc_williams_r(df_per_15m, williams_period)
+        # if df_per_15m[f'williams_r{williams_period}'].iloc[-1] < -20:
+        #     return False
         
         return True

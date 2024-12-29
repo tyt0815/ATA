@@ -1,41 +1,81 @@
 import numpy as np
 import pandas as pd
 
-def calc_ma(prices, period):
-    return prices.rolling(window=period).mean()
-
-def calc_ema(price, period):
-    df = pd.DataFrame(price)
-    return df.ewm(span=period, adjust=False).mean()
-
-def calc_bollinger_bands(prices, window_size):
-        # 이동평균 계산
-        rolling_mean = calc_ma(prices, window_size)
-        
-        # 표준편차 계산
-        rolling_std = prices.rolling(window=window_size).std()
-        
-        # 상단 밴드와 하단 밴드 계산
-        upper_band = rolling_mean + (rolling_std * 2)
-        lower_band = rolling_mean - (rolling_std * 2)
-        
-        # 볼린저 %b 계산
-        bollinger_b = (prices - lower_band) / (upper_band - lower_band)
-        
-        # 결과를 데이터프레임으로 반환
-        return pd.DataFrame({
-            'moving_avg': rolling_mean,
-            'upper_band': upper_band,
-            'lower_band': lower_band,
-            "b": bollinger_b
-        })
+def calc_sma(df, period, force_calc = False):
+    '''
+    df: "close"를 가지고 있어야 함
+    return: f"sma{period}" 컬럼을 포함한 df
+    '''
+    if f"sma{period}" in df.columns and not force_calc:
+        return df
     
-def calc_mfi(ohlcv, period=14):
-        # Typical Price 계산
-    typical_price = (ohlcv['high'] + ohlcv['low'] + ohlcv['close']) / 3
+    df[f"sma{period}"] = df["close"].rolling(window=period).mean()
+    return df
+
+def calc_ema(df, period, force_calc = False):
+    '''
+    df: "clsoe"를 가지고 있어야 함
+    return: f"ema{period}" 컬럼을 포함한 df
+    '''
+    if f"ema{period}" in df.columns and not force_calc:
+        return df
+    
+    df[f"ema{period}"] = df["close"].ewm(span=period, adjust=False).mean()
+    return df
+
+def calc_std(df, period, force_calc = False):
+    '''
+    df: "close"를 가지고 있어야 함
+    return: f"std{period}" 컬럼을 포함한 df
+    '''
+    if f"std{period}" in df.columns and not force_calc:
+        return df
+    
+    df[f"std{period}"] = df["close"].rolling(window=period).std()
+    return df 
+
+def calc_bollinger_bands(df, period, num_std_dev, force_calc = False):
+    '''
+    df: "close"를 가지고 있어야 함.
+    return: f"upper_band{period}_{num_std_dev}", f"lower_band{period}_{num_std_dev}", f"bollinger_b{period}_{num_std_dev}",
+        컬럼을 포함한 df
+    '''
+    columns_to_check = [f"upper_band{period}_{num_std_dev}", f"lower_band{period}_{num_std_dev}", f"bollinger_b{period}_{num_std_dev}"]
+    
+    if all(col in df.columns for col in columns_to_check) and not force_calc:
+        return df
+    
+    df = calc_sma(df, period)
+    df = calc_std(df, period)
+    
+    # 상단 밴드와 하단 밴드 계산
+    df[f"upper_band{period}_{num_std_dev}"] = df[f"sma{period}"] + (df[f"std{period}"] * num_std_dev)
+    df[f"lower_band{period}_{num_std_dev}"] = df[f"sma{period}"] - (df[f"std{period}"] * num_std_dev)
+    
+    # 볼린저 %b 계산
+    
+    df[f"bollinger_b{period}_{num_std_dev}"] = (
+        (df["close"] - df[f"lower_band{period}_{num_std_dev}"]) / 
+        (df[f"upper_band{period}_{num_std_dev}"] - df[f"lower_band{period}_{num_std_dev}"])
+        )
+    
+    # 결과를 데이터프레임으로 반환
+    return df
+
+    
+def calc_mfi(df, period=14, force_calc = False):
+    '''
+    df: 'high', 'low', 'close', 'volume' 가지고 있어야 함.
+    return: f"mfi{period}" 컬럼을 포함한 df
+    '''
+    if f"mfi{period}" in df.columns and not force_calc:
+        return df
+    
+    # Typical Price 계산
+    typical_price = (df['high'] + df['low'] + df['close']) / 3
     
     # Raw Money Flow 계산
-    raw_money_flow = typical_price * ohlcv['volume']
+    raw_money_flow = typical_price * df['volume']
     
     # Positive/Negative Money Flow 구분
     price_change = typical_price.diff()
@@ -48,25 +88,47 @@ def calc_mfi(ohlcv, period=14):
     
     # Money Flow Ratio and MFI 계산
     money_flow_ratio = positive_mf_sum / negative_mf_sum
-    mfi = 100 - (100 / (1 + money_flow_ratio))
+    df[f"mfi{period}"] = 100 - (100 / (1 + money_flow_ratio))
     
-    return mfi
+    return df
 
-def calc_rvol(self, volumes, window=10):
-    pd.DataFrame(volumes)
-    rolling_mean = volumes.rolling(window=window).mean()
+def calc_rvol(self, df, period=10, force_calc = False):
+    '''
+    df: 'volume' 가지고 있어야 함.
+    return: f'rvol{period}' 컬럼을 포함한 df
+    '''
+    if f'rvol{period}' in df.columns and not force_calc:
+        return df
+    
+    rolling_mean = df['volume'].rolling(window=period).mean()
 
     # 현재 거래량(baseVolume)과 평균 거래량(rolling_mean) 비교
-    rvol = volumes / rolling_mean
-    return rvol
+    df[f'rvol{period}'] = df['volume'] / rolling_mean
+    return df
 
-def calc_williams_r(ohlcv, period=10):
+def calc_williams_r(df, period=10, force_calc = False):
+    '''
+    df: 'high', 'low', 'close' 가지고 있어야 함.
+    return: f'williams_r{period}' 컬럼을 포함한 df
+    '''
+    if f'williams_r{period}' in df.columns and not force_calc:
+        return df
+    
     # 최고가, 최저가, 종가 계산
-    williams_r = ((ohlcv['high'].rolling(window=period).max() - ohlcv['close']) / 
-                         (ohlcv['high'].rolling(window=period).max() - ohlcv['low'].rolling(window=period).min())) * -100
-    return williams_r
+    df[f'williams_r{period}'] = ((df['high'].rolling(window=period).max() - df['close']) / 
+                         (df['high'].rolling(window=period).max() - df['low'].rolling(window=period).min())) * -100
+    return df
 
-def deviation_from_ma(price, ma):
-    # 이동 평균 계산 (SMA 또는 EMA)
+def calc_deviation_from_sma(df, period=20, force_calc = False):
+    '''
+    df: 'close' 가지고 있어야 함.
+    return: f'deviation_sma{period}' 컬럼을 포함한 df
+    '''
+    if f'deviation_sma{period}' in df.columns and not force_calc:
+        return df
+    
+    # 이동 평균 계산 (SMA)
+    df = calc_sma(df, period)
     # 이격도 계산
-    return ((price - ma) / ma) * 100
+    df[f'deviation_sma{period}'] = ((df['close'] - df[f'sma{period}']) / df[f'sma{period}']) * 100
+    return df

@@ -17,11 +17,11 @@ class BaseExchange:
         pass
     
     @abstractmethod
-    def buy(self, coin):
+    def buy(self, coin, amount_krw):
         pass
     
     @abstractmethod
-    def sell(self, coin):
+    def sell(self, coin, amount_krw):
         pass
     
     @abstractmethod

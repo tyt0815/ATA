@@ -32,7 +32,7 @@ class OfflineExchange(BaseExchange):
         if len(self.data) <= self.idx:
             return False
         
-        self.ohlcv_per_1m = self.data[max(self.idx + 1 - 20, 0):self.idx + 1]
+        self.ohlcv_per_1m = self.data[max(self.idx + 1 - 20, 0):self.idx + 1].copy()
         columns_to_resample = ['open', 'high', 'low', 'close', 'volume']
         
         temp_data = self.data[columns_to_resample].iloc[max(self.idx + 1 - 300, 0):self.idx + 1]
@@ -46,26 +46,28 @@ class OfflineExchange(BaseExchange):
                 'low': 'min',
                 'close': 'last',
                 'volume': 'sum'
-        }).reset_index(drop=True))  # 그룹 컬럼 제거
+        }).reset_index(drop=True)).copy()  # 그룹 컬럼 제거
         
         return True
     
-    def buy(self, coin):
-        self.buying_amount += self.krw
+    def buy(self, coin, amount_krw):
+        amount_krw = min(amount_krw, self.krw)
+        self.buying_amount += amount_krw
         curr_price = self.get_current_price(coin=coin)
-        self.coin += self.krw / curr_price
-        self.krw -= self.krw
+        self.coin += amount_krw / curr_price
+        self.krw -= amount_krw
         self._buy_log(coin)
-        return self.buying_amount, curr_price
+        return amount_krw, curr_price
     
-    def sell(self, coin):
+    def sell(self, coin, amount_krw):
         curr_price = self.get_current_price(coin=coin)
-        selling_amount = self.coin * curr_price
-        self.krw += selling_amount
-        self.coin -= self.coin
-        self._sell_log(coin=coin, difference=selling_amount - self.buying_amount)
+        amount_krw = min(amount_krw, self.coin * curr_price)
+        amount_coin = amount_krw / curr_price
+        self.krw += amount_krw
+        self.coin -= amount_coin
+        self._sell_log(coin=coin, difference=amount_krw - self.buying_amount)
         self.buying_amount = 0
-        return selling_amount, curr_price
+        return amount_krw, curr_price
     
     def get_ohlcv_per_1m(self, coin):
         return self.ohlcv_per_1m
