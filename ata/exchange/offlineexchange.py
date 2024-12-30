@@ -9,6 +9,7 @@ class OfflineExchange(BaseExchange):
         file_path,
         balance = 100000
         ):
+        super().__init__()
         try:
             self.data = pd.read_csv(file_path)
             self.data = self.data.rename(columns={"baseVolume": "volume"})
@@ -16,16 +17,24 @@ class OfflineExchange(BaseExchange):
             print(f"Data file read error: {e}")
             quit()
         
-        self.krw = balance
-        self.coin = 0
-        self.buying_amount = 0
+        self.balance = {
+                'KRW': {'free': balance, 'used': 0, 'total': balance},
+                'BTC': {'free': 0, 'used': 0, 'total': 0}
+            }
+        
         self.ohlcv_per_1m = None
         self.ohlcv_per_15m = None
-    
+        self.end_condition = self.balance['KRW']['total'] * 0.9
+        self.__id_cnt = 0
+        self.__order = {}
+        
         offset = 300
         assert offset <= len(self.data), f"error: not enough offline data ({offset} {len(self.data)})"
         self.idx = offset - 2
         self.update()
+    
+    def init(self):
+        pass
     
     def update(self) -> bool:
         self.idx += 1
@@ -48,35 +57,68 @@ class OfflineExchange(BaseExchange):
                 'volume': 'sum'
         }).reset_index(drop=True)).copy()  # 그룹 컬럼 제거
         
+        if self.get_total_balance() < self.end_condition:
+            return False
+        
         return True
     
-    def buy(self, coin, amount_krw):
-        amount_krw = min(amount_krw, self.krw)
-        self.buying_amount += amount_krw
-        curr_price = self.get_current_price(coin=coin)
-        self.coin += amount_krw / curr_price
-        self.krw -= amount_krw
-        self._buy_log(coin)
-        return amount_krw, curr_price
+    def get_buying_candidates(self):
+        return ['BTC']
     
-    def sell(self, coin, amount_krw):
-        curr_price = self.get_current_price(coin=coin)
-        amount_krw = min(amount_krw, self.coin * curr_price)
-        amount_coin = amount_krw / curr_price
-        self.krw += amount_krw
-        self.coin -= amount_coin
-        self._sell_log(coin=coin, difference=amount_krw - self.buying_amount)
-        self.buying_amount = 0
-        return amount_krw, curr_price
+    def create_buy_order(self, item, price, amount):
+        krw = price * amount
+        if krw > self.balance['KRW']['free']: 
+            raise Exception(f'금액 초과(request: {krw}, remained: {self.balance["KRW"]["free"]})')
+        self.balance['BTC']['free'] += amount
+        self.balance['BTC']['total'] += amount
+        self.balance['KRW']['free'] -= krw
+        self.balance['KRW']['total'] -= krw
+        return self.__make_order(item, status='closed', side='bid', price=price, amount=amount, filled=amount)
     
-    def get_ohlcv_per_1m(self, coin):
+    def create_buy_order_at_market_price(self, item, amount):
+        return self.create_buy_order(item, item, self.get_current_price(item=item), amount)
+    
+    def create_sell_order(self, item, price, amount):
+        krw = price * amount
+        if amount > self.balance[item]['free']:
+            raise Exception(f'{item} 부족(request: {amount}, remained: {self.balance[item]["free"]})')
+        self.balance['KRW']['free'] += krw
+        self.balance['KRW']['total'] += krw
+        self.balance['BTC']['free'] -= amount
+        self.balance['BTC']['total'] -= amount
+        return self.__make_order(item, status='closed', side='ask', price=price, amount=amount, filled=amount)
+    
+    def create_sell_order_at_market_price(self, item, amount):
+        return self.create_sell_order(item=item, price=self.get_current_price(item=item), amount=amount)
+    
+    def get_ohlcv_per_1m(self, item):
+        if item == 'KRW':
+            return None
         return self.ohlcv_per_1m
     
-    def get_ohlcv_per_15m(self, coin):
+    def get_ohlcv_per_15m(self, item):
+        if item == 'KRW':
+            return None
         return self.ohlcv_per_15m
     
-    def get_current_price(self, coin):
-        return self.data["close"].iloc[self.idx]
+    def get_total_balance(self):
+        return self.balance['KRW']['total'] + self.balance['BTC']['total'] * self.get_current_price('BTC')
     
-    def get_balance(self):
-        return self.krw + self.coin * self.get_current_price(coin="")
+    def get_order(self, order_id):
+        return self.__order[order_id]
+    
+    def cancel_order_by_id(self, order_id):
+        pass
+    
+    def cancel_order_by_item(self, item):
+        pass
+    
+    def cancel_order_all(self):
+        pass
+    
+    def __make_order(self, item, status, side, price, amount, filled):
+        order_id = f'{self.__id_cnt}'
+        self.__id_cnt += 1
+        self._save_order_id(item=item, order_id=order_id)
+        self.__order[order_id] = {'status': status, 'side': side, 'price': price, 'amount': amount, 'filled': filled}
+        return order_id

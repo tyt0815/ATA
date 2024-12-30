@@ -5,6 +5,7 @@ import numpy as np
 import os
 import pandas as pd
 import sys
+import traceback
 
 from ata.algorithm import trading
 from ata.exchange.baseexchange import BaseExchange
@@ -12,213 +13,149 @@ from ata.exchange.baseexchange import BaseExchange
 class AutoTradingAgent:
     def __init__(
         self,
-        exchange:BaseExchange,
-        targets: list=["BTC", "ETH", "DOGE"],
-        end_condition=0.3
+        exchange:BaseExchange
         ):
-        
         self.exchange = exchange
-        self.targets = targets
         
-        self.end_condition = self.exchange.get_balance() * (1 - end_condition)
-        
-    def run(self):
-        file_path = os.path.abspath(sys.argv[0])
-        file_path = os.path.join(os.path.dirname(file_path), "figures")
-        file_path = os.path.join(file_path, datetime.now().strftime("%Y-%m-%d-%H-%M-%S"))
-        os.makedirs(file_path, exist_ok=True)
-        
-        self.prev_price_history = []
-        self.prev_moving_avg_history = []
-        self.prev_upper_band_history = []
-        self.prev_lower_band_history = []
-        prev_buy_index = 0
-        prev_sell_index = 0
-        prev_buy_price = 0
-        prev_sell_price = 0
-        
-        for t in count():
-            current_target = None
-            plt.figure(figsize=(30, 6))
-            
-            self.price_history = []
-            self.moving_avg_history = []
-            self.upper_band_history = []
-            self.lower_band_history = []
-            
-            b_buy = False
-            # 매수 루프            
+    def run(self):        
+        buy_cnt = {}
+        # 거래 루프
+        self.exchange.init()
+        try:
             while True:
                 if self.exchange.update() == False:
-                    return
-                for coin in self.targets:
-                    if self._is_buy_timing(coin=coin):
-                        _, buy_price = self.exchange.buy(coin=coin, amount_krw=self.exchange.krw)
-                        buy_index = len(self.price_history) - 1
-                        b_buy = True
-                        current_target = coin
-                        break
-                
-                if b_buy:
                     break
+                # 매수 주문 넣기
+                buying_candidates = self.exchange.get_buying_candidates()
+                for target in buying_candidates:
+                    ohlcv = self.exchange.get_ohlcv_per_1m(target)
+                    if self.exchange.balance['KRW']['total'] > 0 and self._is_buy_timing(ohlcv):
+                        self.exchange.cancel_order_by_item(target)
+                        curr_price = self.exchange.get_current_price(item=target)
+                        if not target in buy_cnt:
+                            buy_cnt[target] = 0
+                        krw = min(self.exchange.get_total_balance() / 9 * (buy_cnt[target] + 1), self.exchange.balance['KRW']['free'])
+                        amount = krw / curr_price
+                        buy_id = self.exchange.create_buy_order(item=target, price=curr_price, amount=amount)
+                
+                # 매도 주문 넣기
+                selling_candidates = self.exchange.balance
+                for target in selling_candidates:
+                    ohlcv = self.exchange.get_ohlcv_per_1m(target)
+                    if ohlcv is None:
+                        continue
+                    if self.exchange.balance[target]['total'] > 0 and self._is_sell_timing(ohlcv):
+                        self.exchange.cancel_order_by_item(target)
+                        curr_price = self.exchange.get_current_price(item=target)
+                        amount = self.exchange.balance[target]['free']
+                        sell_id = self.exchange.create_sell_order(target, price=curr_price, amount=amount)
+                
+                # 주문 현황 확인
+                for target in self.exchange.order_ids:
+                    order_ids = self.exchange.order_ids[target][:]
+                    for order_id in order_ids:
+                        order = self.exchange.get_order(order_id)
+                        # 주문이 진행중일때
+                        if order['status'] == 'open':
+                            # 매수 주문
+                            if order['side'] == 'bid':
+                                # 매수 주문 금액이 너무 낮을 때, 주문을 취소
+                                if order['price'] * 1.05 < self.exchange.get_current_price(target):
+                                    self.exchange.cancel_order_by_id(order_id)
+                            # 매도 주문
+                            elif order['side'] == 'ask':
+                                # 매도 주문 금액이 너무 높을 때, 주문을 시장가 매도로 전환
+                                if order['price'] * 0.95 > self.exchange.get_current_price(target):
+                                    self.exchange.cancel_order_by_id(order_id)
+                        # 주문이 채결되었을때
+                        elif order['status'] == 'closed':
+                            # 매수 주문
+                            if order['side'] == 'bid':
+                                buy_cnt[target] += 1
+                                self._log(f'Close buy order ({order_id}). buy  {target:>4} at {order["price"]}, {self.exchange.get_total_balance()}')
+                            # 매도 주문
+                            elif order['side'] == 'ask':
+                                buy_cnt[target] = 0
+                                self._log(f'Close sell order({order_id}). sell {target:>4} at {order["price"]}, {self.exchange.get_total_balance()}')
+                            else:
+                                raise Exception(f'unexpected order side({order["side"]})')
+
+                            self.exchange.remove_order_id(item=target, order_id=order_id)
+                        # 취소된 주문이 남아있을 때 order_id에서 제거
+                        elif order['status'] == 'canceled':
+                            if order['side'] == 'bid':
+                                self._log(f'Cancel buy order ({order_id}). order amount: {order["amount"]}, filled: {order["filled"]}')
+                            elif order['side'] == 'ask':
+                                self._log(f'Cancel sell order({order_id}). order amount: {order["amount"]}, filled: {order["filled"]}')
+                            self.exchange.remove_order_id(item=target, order_id=order_id)
+                        # 에러
+                        else:
+                            raise Exception(f'unexpected order status({order["status"]})')
+        except Exception as e:
+            self._log(f'unexpected error: {e}')
+            print(traceback.format_exc())
+        finally:
+            self._end_trading()
             
-            # 매도 루프
-            while True:
-                if self.exchange.update() == False:
-                    return
-                if self._is_sell_timing(coin=current_target):
-                    _, sell_price = self.exchange.sell(coin=current_target, amount_krw=self.exchange.get_balance())
-                    sell_index = len(self.price_history) - 1
-                    break
+    def _end_trading(self):
+        selling_candidates = self.exchange.balance
+        self.exchange.init()
+        for target in selling_candidates:
+            try:
+                self.exchange.cancel_order_by_item(target)
+                self.exchange.create_sell_order_at_market_price(item=target, amount=self.exchange.balance[target]['free'])
+            except Exception as e:
+                self._log(e)
+                print(traceback.format_exc())
+            finally:
+                continue
+        return
                 
-            # 시각화
-            if t > 0:
-                offset = 200
-                start = max(prev_buy_index - offset, 0)
-                end = min(prev_sell_index + offset, len(self.prev_price_history))
-                
-                self.prev_price_history = self.prev_price_history[start:end]
-                self.prev_moving_avg_history = self.prev_moving_avg_history[start:end]
-                self.prev_upper_band_history = self.prev_upper_band_history[start:end]
-                self.prev_lower_band_history = self.prev_lower_band_history[start:end]
-                prev_buy_index -= start
-                prev_sell_index -= start
-                
-                plt.plot(self.prev_price_history, label="price", color="blue", alpha=0.5)
-                plt.plot(self.prev_moving_avg_history, label='Moving Average', color='green', linestyle='--')
-                plt.plot(self.prev_upper_band_history, label='Upper Band', color='red', linestyle='--')
-                plt.plot(self.prev_lower_band_history,  label='Lower Band', color='red', linestyle='--')
-                
-                plt.fill_between(
-                    [i for i in range(end - start)],
-                    self.prev_upper_band_history,
-                    self.prev_lower_band_history,
-                    color='gray',
-                    alpha=0.1,
-                    label='Bollinger Band'
-                )
-                
-                plt.scatter(prev_buy_index, prev_buy_price, color='red', marker='o', s=100, label='Buy Point')
-                plt.scatter(prev_sell_index, prev_sell_price, color='black', marker='o', s=100, label='Sell Point')
-                
-                plt.xlabel('Time')
-                plt.ylabel('Price')
-                plt.legend()
-                plt.grid()
-                plt.savefig(os.path.join(file_path, f"{t}.png"))
-            plt.close()
-            
-            self.prev_price_history = self.price_history
-            self.prev_moving_avg_history = self.moving_avg_history
-            self.prev_upper_band_history = self.upper_band_history
-            self.prev_lower_band_history = self.lower_band_history
-            prev_buy_index = buy_index
-            prev_sell_index = sell_index
-            prev_buy_price = buy_price
-            prev_sell_price = sell_price
-            
-        
-    def _is_buy_timing(self, coin):
-        # per 1m
-        df_per_1m = self.exchange.get_ohlcv_per_1m(coin=coin)
-        
+    def _is_buy_timing(self, ohlcv):
         # 볼린저
         bollinger_period = 20
         bollinger_num_std_dev = 2
-        df_per_1m = trading.calc_bollinger_bands(df=df_per_1m, period=bollinger_period, num_std_dev=bollinger_num_std_dev)
-        
-        # 차트
-        self.prev_price_history.append(df_per_1m["close"].iloc[-1])
-        self.prev_moving_avg_history.append(df_per_1m[f"sma{bollinger_period}"].iloc[-1])
-        self.prev_upper_band_history.append(df_per_1m[f"upper_band{bollinger_period}_{bollinger_num_std_dev}"].iloc[-1])
-        self.prev_lower_band_history.append(df_per_1m[f"lower_band{bollinger_period}_{bollinger_num_std_dev}"].iloc[-1])
-        
-        self.price_history.append(df_per_1m["close"].iloc[-1])
-        self.moving_avg_history.append(df_per_1m[f"sma{bollinger_period}"].iloc[-1])
-        self.upper_band_history.append(df_per_1m[f"upper_band{bollinger_period}_{bollinger_num_std_dev}"].iloc[-1])
-        self.lower_band_history.append(df_per_1m[f"lower_band{bollinger_period}_{bollinger_num_std_dev}"].iloc[-1])
+        ohlcv = trading.calc_bollinger_bands(df=ohlcv, period=bollinger_period, num_std_dev=bollinger_num_std_dev)
         
         # 가격이 볼린저 밴드 하단을 터치치하였는가
-        if df_per_1m[f"lower_band{bollinger_period}_{bollinger_num_std_dev}"].iloc[-1] < df_per_1m["close"].iloc[-1]:
+        if ohlcv[f"lower_band{bollinger_period}_{bollinger_num_std_dev}"].iloc[-1] < ohlcv["close"].iloc[-1]:
             return False
         
         # 볼린저 %b가 0이하인가
-        if df_per_1m[f"bollinger_b{bollinger_period}_{bollinger_num_std_dev}"].iloc[-1] > 0:
+        if ohlcv[f"bollinger_b{bollinger_period}_{bollinger_num_std_dev}"].iloc[-1] > 0:
             return False
         
         # mfi가 20이하인가
         mfi_peirod = 14
-        df_per_1m = trading.calc_mfi(df=df_per_1m, period=mfi_peirod)
-        if df_per_1m[f'mfi{mfi_peirod}'].iloc[-1] > 20:
+        ohlcv = trading.calc_mfi(df=ohlcv, period=mfi_peirod)
+        if ohlcv[f'mfi{mfi_peirod}'].iloc[-1] > 20:
             return False
-        
-        # # per 15m
-        # df_per_15m = self.exchange.get_ohlcv_per_15m(coin=coin)
-        # # ema120 > ema20 > ema1(주가)인가
-        # df_per_15m = trading.calc_ema(df_per_15m, 20)
-        # df_per_15m = trading.calc_ema(df_per_15m, 120)
-        # if not(df_per_15m['ema120'].iloc[-1] > df_per_15m['ema20'].iloc[-1] and df_per_15m['ema20'].iloc[-1] > df_per_15m["close"].iloc[-1]):
-        #     return False
-        
-        # # 이격도가 아래 4선에 도달했는가
-        # df_per_15m = trading.calc_deviation_from_sma(df_per_15m, 120)
-        # if min(df_per_15m['deviation_sma120']) >= 0:
-        #     return False
-        
-        # # 윌리엄스 %R이 하단을 이탈하였는가
-        # williams_period = 10
-        # df_per_15m = trading.calc_williams_r(df_per_15m, williams_period)
-        # if df_per_15m[f'williams_r{williams_period}'].iloc[-1] > -90:
-        #     return False
         
         return True
     
-    def _is_sell_timing(self, coin):
-        # per 1m
-        df_per_1m = self.exchange.get_ohlcv_per_1m(coin=coin)
-        
+    def _is_sell_timing(self, ohlcv):
         # 볼린저
         bollinger_period = 20
         bollinger_num_std_dev = 2
-        df_per_1m = trading.calc_bollinger_bands(df=df_per_1m, period=bollinger_period, num_std_dev=bollinger_num_std_dev)
-        
-        # 차트
-        self.price_history.append(df_per_1m["close"].iloc[-1])
-        self.moving_avg_history.append(df_per_1m[f"sma{bollinger_period}"].iloc[-1])
-        self.upper_band_history.append(df_per_1m[f"upper_band{bollinger_period}_{bollinger_num_std_dev}"].iloc[-1])
-        self.lower_band_history.append(df_per_1m[f"lower_band{bollinger_period}_{bollinger_num_std_dev}"].iloc[-1])
+        ohlcv = trading.calc_bollinger_bands(df=ohlcv, period=bollinger_period, num_std_dev=bollinger_num_std_dev)
         
         # 가격이 볼린저 밴드 상단을 터치하였는가
-        if df_per_1m[f"upper_band{bollinger_period}_{bollinger_num_std_dev}"].iloc[-1] > df_per_1m["close"].iloc[-1]:
+        if ohlcv[f"upper_band{bollinger_period}_{bollinger_num_std_dev}"].iloc[-1] > ohlcv["close"].iloc[-1]:
             return False
         
         # 볼린저 %b가 1이상인가
-        if df_per_1m[f"bollinger_b{bollinger_period}_{bollinger_num_std_dev}"].iloc[-1] < 1:
+        if ohlcv[f"bollinger_b{bollinger_period}_{bollinger_num_std_dev}"].iloc[-1] < 1:
             return False
         
         # mfi가 80이상인가
         mfi_peirod = 14
-        df_per_1m = trading.calc_mfi(df=df_per_1m, period=mfi_peirod)
-        if df_per_1m[f'mfi{mfi_peirod}'].iloc[-1] < 80:
+        ohlcv = trading.calc_mfi(df=ohlcv, period=mfi_peirod)
+        if ohlcv[f'mfi{mfi_peirod}'].iloc[-1] < 80:
             return False
         
-        # # per 15m
-        # df_per_15m = self.exchange.get_ohlcv_per_15m(coin=coin)
-        # # ema120 < ema20 < ema1(주가)인가
-        # df_per_15m = trading.calc_ema(df_per_15m, 20)
-        # df_per_15m = trading.calc_ema(df_per_15m, 120)
-        # if not (df_per_15m['ema120'].iloc[-1] < df_per_15m['ema20'].iloc[-1] and df_per_15m['ema20'].iloc[-1] < df_per_15m["close"].iloc[-1]):
-        #     return False
-        
-        # # 이격도가 위 4선에 도달했는가
-        # df_per_15m = trading.calc_deviation_from_sma(df_per_15m, 120)
-        # if min(df_per_15m['deviation_sma120']) <= 0:
-        #     return False
-        
-        # # 윌리엄스 %R이 상단단을 이탈하였는가
-        # williams_period = 10
-        # df_per_15m = trading.calc_williams_r(df_per_15m, williams_period)
-        # if df_per_15m[f'williams_r{williams_period}'].iloc[-1] < -20:
-        #     return False
-        
         return True
+        
+    def _log(self, content):
+        now = datetime.now()
+        now_str = now.strftime("[%Y-%m-%d %H:%M:%S]")
+        print(now_str, content)
