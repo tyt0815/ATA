@@ -20,9 +20,10 @@ class AutoTradingAgent:
     def run(self):        
         buy_cnt = {}
         # 거래 루프
-        self.exchange.init()
-        try:
-            while True:
+        if not self.__try_init_exchange:
+            return
+        while True:
+            try:
                 if self.exchange.update() == False:
                     break
                 # 매수 주문 넣기
@@ -91,11 +92,10 @@ class AutoTradingAgent:
                         # 에러
                         else:
                             raise Exception(f'unexpected order status({order["status"]})')
-        except Exception as e:
-            self._log(f'unexpected error: {e}')
-            print(traceback.format_exc())
-        finally:
-            self._end_trading()
+            except Exception as e:
+                self._log(f'unexpected error: {e}')
+                if not self.__try_init_exchange():
+                    return
             
     def _end_trading(self):
         selling_candidates = self.exchange.balance
@@ -159,3 +159,10 @@ class AutoTradingAgent:
         now = datetime.now()
         now_str = now.strftime("[%Y-%m-%d %H:%M:%S]")
         print(now_str, content)
+        
+    def __try_init_exchange(self):
+        for i in range(5):
+            if self.exchange.init():
+                return True
+        self._log('Exchange init fail')
+        return False

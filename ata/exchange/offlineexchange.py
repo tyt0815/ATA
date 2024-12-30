@@ -34,7 +34,7 @@ class OfflineExchange(BaseExchange):
         self.update()
     
     def init(self):
-        pass
+        return True
     
     def update(self) -> bool:
         self.idx += 1
