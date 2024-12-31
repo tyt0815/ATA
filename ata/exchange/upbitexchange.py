@@ -31,9 +31,6 @@ class UpbitExchange(BaseExchange):
             log('init fail')
             return False
         
-        
-        self.ohlcvs_1m = {}
-        self.ohlcvs_15m = {}
         self.update()
         log('done')
         return True

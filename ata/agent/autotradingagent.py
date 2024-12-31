@@ -9,7 +9,7 @@ import traceback
 
 from ata.algorithm import trading
 from ata.exchange.baseexchange import BaseExchange
-from ata.utils.log import log
+from ata.utils.log import log, save_log
 
 class AutoTradingAgent:
     def __init__(
@@ -62,9 +62,12 @@ class AutoTradingAgent:
                             log(f'Sell {target} at {sell_order["price"]}({self.exchange.get_total_balance()})')
                             buy_cnt[target] = 0
             except Exception as e:
-                log(f'unexpected error: {e}')
-                print(traceback.format_exc())
-                break
+                log_path = './log'
+                log(str(e))
+                save_log(content=traceback.format_exc(), file_path=log_path)
+                if not self.__try_init_exchange():
+                    break
+                
         self._end_trading()
             
     def _end_trading(self):
@@ -77,8 +80,11 @@ class AutoTradingAgent:
             try:
                 self.exchange.create_sell_all_order_at_market_price(item=target)
             except Exception as e:
-                log(e)
-                print(traceback.format_exc())
+                log_path = './log'
+                log(str(e))
+                save_log(content=traceback.format_exc(), file_path=log_path)
+                if not self.__try_init_exchange():
+                    break
             finally:
                 continue
         log('end trading')
