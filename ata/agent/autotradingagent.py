@@ -45,7 +45,14 @@ class AutoTradingAgent:
                             buy_order_id = self.exchange.create_buy_order_at_market_price(item=target, amount_krw=krw)
                             buy_order = self.exchange.get_order(buy_order_id)
                             log(f'Buy  {target} at {buy_order["price"]}({self.exchange.get_total_balance()})')
+            except Exception as e:
+                log_path = './log'
+                log(str(e))
+                save_log(content=traceback.format_exc(), file_path=log_path)
+                if not self.__try_init_exchange():
+                    break
                 
+            try:
                 # 매도 주문 넣기
                 selling_candidates = self.exchange.balance
                 for target in selling_candidates:
