@@ -69,3 +69,6 @@ class BaseExchange:
     @abstractmethod
     def cancel_order_all(self):
         pass
+    @abstractmethod
+    def is_plunge(self, item):
+        pass

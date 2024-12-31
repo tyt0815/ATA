@@ -52,7 +52,7 @@ class AutoTradingAgent:
                     ohlcv = self.exchange.get_ohlcv_per_1m(target)
                     if ohlcv is None:
                         continue
-                    if self.exchange.balance[target]['total'] > 0 and self._is_sell_timing(ohlcv):
+                    if self.exchange.balance[target]['total'] > 0 and (self._is_sell_timing(ohlcv) or self.exchange.is_plunge(item=target)):
                         curr_price = self.exchange.get_current_price(item=target)
                         amount_item = self.exchange.balance[target]['free']
                         krw = curr_price * amount_item

@@ -56,6 +56,12 @@ class UpbitExchange(BaseExchange):
                 buying_candidates.append(symbol.split('/')[0])
         return buying_candidates
     
+    def is_plunge(self, item):
+        ticker = self.tickers[item+'/KRW']
+        if ticker['percentage'] < -0.1:
+            return True
+        return False
+    
     def create_buy_order(self, item, price, amount_item):
         resp = self.exchange.create_limit_buy_order(
             symbol=f'{item}/KRW',
@@ -149,3 +155,5 @@ class UpbitExchange(BaseExchange):
         df.set_index(pd_ts, inplace=True)
         df = df[['open', 'high', 'low', 'close', 'volume']]
         return df
+    
+    
