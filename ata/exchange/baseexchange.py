@@ -14,7 +14,10 @@ class BaseExchange:
         return self.sell_at_market_price(item, self.get_total_balance())
     
     def get_current_price(self, item):
-        return self.get_ohlcv_per_1m(item)['close'].iloc[-1]
+        ohlcv = self.get_ohlcv_per_1m(item)
+        if ohlcv is None:
+            return 0
+        return ohlcv['close'].iloc[-1]
     
     def _save_order_id(self, item, order_id):
         if not item in self.order_ids:

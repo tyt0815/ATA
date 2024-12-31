@@ -121,4 +121,4 @@ class OfflineExchange(BaseExchange):
         self.__id_cnt += 1
         self._save_order_id(item=item, order_id=order_id)
         self.__order[order_id] = {'status': status, 'side': side, 'price': price, 'amount': amount, 'filled': filled}
-        return order_id
+        return self.__order[order_id]

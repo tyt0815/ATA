@@ -36,8 +36,9 @@ class AutoTradingAgent:
                         if not target in buy_cnt:
                             buy_cnt[target] = 0
                         krw = min(self.exchange.get_total_balance() / 9 * (buy_cnt[target] + 1), self.exchange.balance['KRW']['free'])
-                        amount = krw / curr_price
-                        buy_id = self.exchange.create_buy_order(item=target, price=curr_price, amount=amount)
+                        if krw > 5100:
+                            amount = krw / curr_price
+                            buy_order = self.exchange.create_buy_order(item=target, price=curr_price, amount=amount)
                 
                 # 매도 주문 넣기
                 selling_candidates = self.exchange.balance
@@ -49,7 +50,9 @@ class AutoTradingAgent:
                         self.exchange.cancel_order_by_item(target)
                         curr_price = self.exchange.get_current_price(item=target)
                         amount = self.exchange.balance[target]['free']
-                        sell_id = self.exchange.create_sell_order(target, price=curr_price, amount=amount)
+                        krw = curr_price * amount
+                        if krw > 5100:
+                            sell_order = self.exchange.create_sell_order(target, price=curr_price, amount=amount)
                 
                 # 주문 현황 확인
                 for target in self.exchange.order_ids:
