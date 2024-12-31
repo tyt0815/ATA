@@ -15,8 +15,7 @@ class AutoTradingAgent:
         log('run ATA...')
         buy_cnt = {}
         # 거래 루프
-        if not self.__try_init_exchange():
-            return
+        self.exchange.init()
         log('trading start')
         while True:
             try:
@@ -42,8 +41,7 @@ class AutoTradingAgent:
                 log_path = './log'
                 log(str(e))
                 save_log(content=traceback.format_exc(), file_path=log_path)
-                if not self.__try_init_exchange():
-                    break
+                self.exchange.init()
                 
             try:
                 # 매도 주문 넣기
@@ -65,13 +63,12 @@ class AutoTradingAgent:
                 log_path = './log'
                 log(str(e))
                 save_log(content=traceback.format_exc(), file_path=log_path)
-                if not self.__try_init_exchange():
-                    break
+                self.exchange.init()
                 
         self._end_trading()
             
     def _end_trading(self):
-        self.__try_init_exchange()
+        self.exchange.init()
         selling_candidates = self.exchange.balance
         for target in selling_candidates:
             ohlcv = self.exchange.get_ohlcv_per_1m(target)
@@ -83,8 +80,7 @@ class AutoTradingAgent:
                 log_path = './log'
                 log(str(e))
                 save_log(content=traceback.format_exc(), file_path=log_path)
-                if not self.__try_init_exchange():
-                    break
+                self.exchange.init()
             finally:
                 continue
         log('end trading')
@@ -133,10 +129,3 @@ class AutoTradingAgent:
             return False
         
         return True
-        
-    def __try_init_exchange(self):
-        for i in range(5):
-            if self.exchange.init():
-                return True
-        log('Exchange init fail')
-        return False

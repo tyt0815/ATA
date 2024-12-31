@@ -16,22 +16,23 @@ class UpbitExchange(BaseExchange):
     
     def init(self):
         log('init upbit exchange...')
-        try:
-            with open(self.file_path) as f:
-                lines = f.readlines()
-                api_key = lines[0].strip()
-                api_secret = lines[1].strip()
+        while True:
+            try:
+                with open(self.file_path) as f:
+                    lines = f.readlines()
+                    api_key = lines[0].strip()
+                    api_secret = lines[1].strip()
 
-            self.exchange = ccxt.upbit(config={
-                'apiKey': api_key,
-                'secret': api_secret,
-                'enableRateLimit': True
-                }
-            )
-            self.exchange.options['createMarketBuyOrderRequiresPrice'] = False
-        except:
-            log('init fail')
-            return False
+                self.exchange = ccxt.upbit(config={
+                    'apiKey': api_key,
+                    'secret': api_secret,
+                    'enableRateLimit': True
+                    }
+                )
+                self.exchange.options['createMarketBuyOrderRequiresPrice'] = False
+                break
+            except:
+                log('login fail')
         
         self.update()
         log('done')
