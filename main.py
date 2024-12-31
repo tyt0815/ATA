@@ -9,14 +9,14 @@ def get_args():
     parser.add_argument(
         "--mod",
         type=str,
-        default="Offline",
+        default="Upbit",
         choices=["Offline", "Upbit"]
     )
     
     parser.add_argument(
         "--file-path",
         type=str,
-        default="BTC_Data.csv"
+        default="upbit.key"
     )
     
     parser.add_argument(
@@ -34,7 +34,8 @@ if __name__ == "__main__":
         exchange = OfflineExchange(args.file_path)
     elif args.mod == 'Upbit':
         exchange = UpbitExchange(
-            end_condition=args.end_condition
+            end_condition=args.end_condition,
+            file_path=args.file_path
         )
         
     agent = AutoTradingAgent(

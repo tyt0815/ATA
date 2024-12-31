@@ -7,15 +7,17 @@ from ata.utils.log import log
 class UpbitExchange(BaseExchange):
     def __init__(
         self,
-        end_condition
+        end_condition,
+        file_path
         ):
         super().__init__()
         self.end_condition = end_condition
+        self.file_path = file_path
     
     def init(self):
         log('init upbit exchange...')
         try:
-            with open("./upbit.key") as f:
+            with open(self.file_path) as f:
                 lines = f.readlines()
                 api_key = lines[0].strip()
                 api_secret = lines[1].strip()
