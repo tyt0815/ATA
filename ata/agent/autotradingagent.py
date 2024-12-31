@@ -63,8 +63,8 @@ class AutoTradingAgent:
                             buy_cnt[target] = 0
             except Exception as e:
                 log(f'unexpected error: {e}')
-                if not self.__try_init_exchange():
-                    return
+                print(traceback.format_exc())
+                break
         self._end_trading()
             
     def _end_trading(self):
