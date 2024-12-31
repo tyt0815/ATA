@@ -65,6 +65,7 @@ class UpbitExchange(BaseExchange):
             amount=amount_item,
             price=price
         )
+        self.balance = self.exchange.fetch_balance()
         return resp['id']
     
     def create_buy_order_at_market_price(self, item, amount_krw):
@@ -72,6 +73,7 @@ class UpbitExchange(BaseExchange):
             symbol=f'{item}/KRW',
             amount=amount_krw
             )
+        self.balance = self.exchange.fetch_balance()
         return resp['id']
     
     def create_sell_order(self, item, price, amount_item):
@@ -80,6 +82,7 @@ class UpbitExchange(BaseExchange):
             amount=amount_item,
             price=price
         )
+        self.balance = self.exchange.fetch_balance()
         return resp['id']
     
     def create_sell_order_at_market_price(self, item, amount_item):
@@ -87,6 +90,7 @@ class UpbitExchange(BaseExchange):
             symbol=f'{item}/KRW',
             amount=amount_item
             )
+        self.balance = self.exchange.fetch_balance()
         return resp['id']
     
     def get_ohlcv_per_1m(self, item):
