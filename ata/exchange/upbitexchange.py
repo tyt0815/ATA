@@ -2,12 +2,18 @@ import ccxt
 import pandas as pd
 
 from ata.exchange.baseexchange import BaseExchange
+from ata.utils.log import log
 
 class UpbitExchange(BaseExchange):
-    def __init__(self):
+    def __init__(
+        self,
+        end_condition
+        ):
         super().__init__()
+        self.end_condition = end_condition
     
     def init(self):
+        log('init upbit exchange...')
         try:
             with open("./upbit.key") as f:
                 lines = f.readlines()
@@ -20,58 +26,68 @@ class UpbitExchange(BaseExchange):
                 'enableRateLimit': True
                 }
             )
+            self.exchange.options['createMarketBuyOrderRequiresPrice'] = False
         except:
+            log('init fail')
             return False
+        
         
         self.ohlcvs_1m = {}
         self.ohlcvs_15m = {}
-        
+        self.update()
+        log('done')
         return True
     
     def update(self) -> bool:
         self.ohlcvs_1m = {}
         self.ohlcvs_15m = {}
         self.balance = self.exchange.fetch_balance()
+        self.tickers = self.exchange.fetch_tickers()
+        if self.get_total_balance() < self.end_condition:
+            return False
         
         return True
     
     def get_buying_candidates(self):
         # TODO
-        return ['BTC', 'ETH']
+        symbols = self.tickers.keys()
+        krw_symbols = [x for x in symbols if x.endswith('KRW')]
+        buying_candidates = []
+        for symbol in krw_symbols:
+            ticker = self.tickers[symbol]
+            if float(ticker['info']['acc_trade_price_24h']) > 100000000000 and ticker['percentage'] > 0:
+                buying_candidates.append(symbol.split('/')[0])
+        return buying_candidates
     
-    def create_buy_order(self, item, price, amount):
+    def create_buy_order(self, item, price, amount_item):
         resp = self.exchange.create_limit_buy_order(
             symbol=f'{item}/KRW',
-            amount=amount,
+            amount=amount_item,
             price=price
         )
-        self._save_order_id(item=item,order_id=resp['id'])
-        return resp
+        return resp['id']
     
-    def create_buy_order_at_market_price(self, item, amount):
+    def create_buy_order_at_market_price(self, item, amount_krw):
         resp = self.exchange.create_market_buy_order(
             symbol=f'{item}/KRW',
-            amount=amount
+            amount=amount_krw
             )
-        self._save_order_id(item=item,order_id=resp['id'])
-        return resp
+        return resp['id']
     
-    def create_sell_order(self, item, price, amount):
+    def create_sell_order(self, item, price, amount_item):
         resp = self.exchange.create_limit_sell_order(
             symbol=f'{item}/KRW',
-            amount=amount,
+            amount=amount_item,
             price=price
         )
-        self._save_order_id(item=item,order_id=resp['id'])
-        return resp
+        return resp['id']
     
-    def create_sell_order_at_market_price(self, item, amount):
+    def create_sell_order_at_market_price(self, item, amount_item):
         resp = self.exchange.create_market_sell_order(
             symbol=f'{item}/KRW',
-            amount=amount
+            amount=amount_item
             )
-        self._save_order_id(item=item,order_id=resp['id'])
-        return resp
+        return resp['id']
     
     def get_ohlcv_per_1m(self, item):
         if not item in self.ohlcvs_1m:
@@ -118,10 +134,6 @@ class UpbitExchange(BaseExchange):
             )
         except:
             return self.get_order(order_id=order_id)
-    
-    def cancel_order_by_item(self, item):
-        for order_id in self.order_ids[item]:
-            self.cancel_order_by_id(order_id=order_id)
         
     
     def cancel_order_all(self):

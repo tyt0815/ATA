@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 
 from ata.exchange.baseexchange import BaseExchange
+from ata.utils.log import log
 
 class OfflineExchange(BaseExchange):
     def __init__(
@@ -25,13 +26,14 @@ class OfflineExchange(BaseExchange):
         self.ohlcv_per_1m = None
         self.ohlcv_per_15m = None
         self.end_condition = self.balance['KRW']['total'] * 0.9
-        self.__id_cnt = 0
         self.__order = {}
         
         offset = 300
         assert offset <= len(self.data), f"error: not enough offline data ({offset} {len(self.data)})"
         self.idx = offset - 2
         self.update()
+        
+        self.__id_cnt = 0
     
     def init(self):
         return True
@@ -65,31 +67,33 @@ class OfflineExchange(BaseExchange):
     def get_buying_candidates(self):
         return ['BTC']
     
-    def create_buy_order(self, item, price, amount):
-        krw = price * amount
+    def create_buy_order(self, item, price, amount_item):
+        krw = min(price * amount_item, self.balance['KRW']['free'])
         if krw > self.balance['KRW']['free']: 
-            raise Exception(f'금액 초과(request: {krw}, remained: {self.balance["KRW"]["free"]})')
-        self.balance['BTC']['free'] += amount
-        self.balance['BTC']['total'] += amount
+            raise Exception(f'KRW 초과(request: {krw}, remained: {self.balance["KRW"]["free"]})')
+        self.balance['BTC']['free'] += amount_item
+        self.balance['BTC']['total'] += amount_item
         self.balance['KRW']['free'] -= krw
         self.balance['KRW']['total'] -= krw
-        return self.__make_order(item, status='closed', side='bid', price=price, amount=amount, filled=amount)
+        return self.__make_order(item, status='closed', side='bid', price=price, amount=amount_item, filled=amount_item)
     
-    def create_buy_order_at_market_price(self, item, amount):
-        return self.create_buy_order(item, item, self.get_current_price(item=item), amount)
+    def create_buy_order_at_market_price(self, item, amount_krw):
+        curr_price = self.get_current_price(item=item)
+        return self.create_buy_order(item=item, price=curr_price,amount_item=amount_krw / curr_price)
     
-    def create_sell_order(self, item, price, amount):
-        krw = price * amount
-        if amount > self.balance[item]['free']:
-            raise Exception(f'{item} 부족(request: {amount}, remained: {self.balance[item]["free"]})')
+    def create_sell_order(self, item, price, amount_item):
+        amount_item = min(amount_item, self.balance[item]['free'])
+        krw = price * amount_item
+        if amount_item > self.balance[item]['free']:
+            raise Exception(f'{item} 부족(request: {amount_item}, remained: {self.balance[item]["free"]})')
         self.balance['KRW']['free'] += krw
         self.balance['KRW']['total'] += krw
-        self.balance['BTC']['free'] -= amount
-        self.balance['BTC']['total'] -= amount
-        return self.__make_order(item, status='closed', side='ask', price=price, amount=amount, filled=amount)
+        self.balance['BTC']['free'] -= amount_item
+        self.balance['BTC']['total'] -= amount_item
+        return self.__make_order(item, status='closed', side='ask', price=price, amount=amount_item, filled=amount_item)
     
-    def create_sell_order_at_market_price(self, item, amount):
-        return self.create_sell_order(item=item, price=self.get_current_price(item=item), amount=amount)
+    def create_sell_order_at_market_price(self, item, amount_item):
+        return self.create_sell_order(item=item, price=self.get_current_price(item=item), amount_item=amount_item)
     
     def get_ohlcv_per_1m(self, item):
         if item == 'KRW':
@@ -110,15 +114,11 @@ class OfflineExchange(BaseExchange):
     def cancel_order_by_id(self, order_id):
         pass
     
-    def cancel_order_by_item(self, item):
-        pass
-    
     def cancel_order_all(self):
         pass
     
     def __make_order(self, item, status, side, price, amount, filled):
         order_id = f'{self.__id_cnt}'
         self.__id_cnt += 1
-        self._save_order_id(item=item, order_id=order_id)
-        self.__order[order_id] = {'status': status, 'side': side, 'price': price, 'amount': amount, 'filled': filled}
-        return self.__order[order_id]
+        self.__order[order_id] = {'status': status, 'side': side, 'price': price, 'amount': amount, 'filled': filled, 'id': order_id}
+        return order_id

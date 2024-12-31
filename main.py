@@ -2,6 +2,7 @@ import argparse
 
 from ata.agent.autotradingagent import AutoTradingAgent
 from ata.exchange.offlineexchange import OfflineExchange
+from ata.exchange.upbitexchange import UpbitExchange
 
 def get_args():
     parser = argparse.ArgumentParser()
@@ -9,14 +10,19 @@ def get_args():
         "--mod",
         type=str,
         default="Offline",
-        choices=["Offline"]
+        choices=["Offline", "Upbit"]
     )
     
-    # 오프라인 모드 전용 옵션션
     parser.add_argument(
         "--file-path",
         type=str,
         default="BTC_Data.csv"
+    )
+    
+    parser.add_argument(
+        '--end-condition',
+        type=int,
+        default=85000
     )
     
     return parser.parse_args()
@@ -26,6 +32,10 @@ if __name__ == "__main__":
     
     if args.mod == "Offline":
         exchange = OfflineExchange(args.file_path)
+    elif args.mod == 'Upbit':
+        exchange = UpbitExchange(
+            end_condition=args.end_condition
+        )
         
     agent = AutoTradingAgent(
         exchange=exchange
