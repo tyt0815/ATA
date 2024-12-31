@@ -40,7 +40,7 @@ class AutoTradingAgent:
                         if not target in buy_cnt:
                             buy_cnt[target] = 0
                         buy_cnt[target] += 1    
-                        krw = min(self.exchange.get_total_balance() / 9 * buy_cnt[target], self.exchange.balance['KRW']['free'])
+                        krw = min(self.exchange.get_total_balance() / 9 * buy_cnt[target], self.exchange.balance['KRW']['free'] - 100)
                         if krw > 6000:
                             buy_order_id = self.exchange.create_buy_order_at_market_price(item=target, amount_krw=krw)
                             buy_order = self.exchange.get_order(buy_order_id)
@@ -71,6 +71,9 @@ class AutoTradingAgent:
         self.__try_init_exchange()
         selling_candidates = self.exchange.balance
         for target in selling_candidates:
+            ohlcv = self.exchange.get_ohlcv_per_1m(target)
+            if ohlcv is None:
+                continue
             try:
                 self.exchange.create_sell_all_order_at_market_price(item=target)
             except Exception as e:
