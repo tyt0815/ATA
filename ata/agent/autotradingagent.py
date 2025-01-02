@@ -30,8 +30,8 @@ class AutoTradingAgent:
                     if self.exchange.balance['KRW']['total'] > 0 and self._is_buy_timing(ohlcv):
                         curr_price = self.exchange.get_current_price(item=target)
                         if not target in buy_cnt:
-                            buy_cnt[target] = 0
-                        krw = min(max(6000, self.exchange.get_total_balance() / 5 * buy_cnt[target]), self.exchange.balance['KRW']['free'] - 100)
+                            buy_cnt[target] = 1
+                        krw = min(max(6000, self.exchange.get_total_balance() / 5 * buy_cnt[target]), self.exchange.balance['KRW']['free'])
                         if krw > 6000:
                             buy_cnt[target] += 1
                             buy_order_id = self.exchange.create_buy_order_at_market_price(item=target, amount_krw=krw)
@@ -58,7 +58,7 @@ class AutoTradingAgent:
                             sell_order_id = self.exchange.create_sell_all_order_at_market_price(item=target)
                             sell_order = self.exchange.get_order(sell_order_id)
                             log(f'Sell {target} at {sell_order["price"]}({self.exchange.get_total_balance()})')
-                            buy_cnt[target] = 0
+                            buy_cnt[target] = 1
             except Exception as e:
                 log_path = './log'
                 log(str(e))
