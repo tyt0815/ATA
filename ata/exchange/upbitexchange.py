@@ -49,7 +49,6 @@ class UpbitExchange(BaseExchange):
         return True
     
     def get_buying_candidates(self):
-        # TODO
         symbols = self.tickers.keys()
         krw_symbols = [x for x in symbols if x.endswith('KRW')]
         buying_candidates = []
