@@ -33,10 +33,10 @@ class AutoTradingAgent:
                             buy_cnt[target] = 1
                         krw = min(max(6000, self.exchange.get_total_balance() / 5 * buy_cnt[target]), self.exchange.balance['KRW']['free'] - 100)
                         if krw > 6000:
-                            buy_cnt[target] += 1
                             buy_order_id = self.exchange.create_buy_order_at_market_price(item=target, amount_krw=krw)
                             buy_order = self.exchange.get_order(buy_order_id)
                             log(f'Buy  {target} at {buy_order["price"]}(amount: {krw}, total: {self.exchange.get_total_balance()}) Debug - buy_cnt["{target}"] = {buy_cnt[target]}')
+                            buy_cnt[target] += 1
             except Exception as e:
                 log_path = './log'
                 log(str(e))
