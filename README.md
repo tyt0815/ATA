@@ -17,3 +17,9 @@ nohup python -u main.py > output.log 2>&1 &
 ps aux | grep main.py
 kill -9 ~
 ```
+
+
+# 시뮬레이션 실행
+```
+python main.py --file-path BTC_Data.csv --mod Offline
+```
