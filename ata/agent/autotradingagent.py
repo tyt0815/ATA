@@ -17,26 +17,28 @@ class AutoTradingAgent:
         # 거래 루프
         self.exchange.init()
         log('trading start')
+        monitoring_target = set()
         while True:
             try:
                 if self.exchange.update() == False:
                     break
                 # 매수 주문 넣기
-                buying_candidates = self.exchange.get_buying_candidates()
+                buying_candidates = monitoring_target.union(self.exchange.get_buying_candidates())
                 for target in buying_candidates:
                     ohlcv = self.exchange.get_ohlcv_per_1m(target)
                     if ohlcv is None:
                         continue
                     if self.exchange.balance['KRW']['total'] > 0 and self._is_buy_timing(ohlcv):
-                        curr_price = self.exchange.get_current_price(item=target)
+                        monitoring_target.add(target)
                         if not target in buy_cnt:
-                            buy_cnt[target] = 1
-                        krw = min(max(6000, self.exchange.get_total_balance() / 5 * buy_cnt[target]), self.exchange.balance['KRW']['free'] - 100)
-                        if krw > 6000:
+                            buy_cnt[target] = 0
+                        buy_cnt[target] += 1
+                        buying_boundary = 1
+                        krw = min(max(6000, self.exchange.get_total_balance() / 5 * (buy_cnt[target] - buying_boundary)), self.exchange.balance['KRW']['free'] - 100)
+                        if buy_cnt[target] > buying_boundary and  krw > 6000:
                             buy_order_id = self.exchange.create_buy_order_at_market_price(item=target, amount_krw=krw)
                             buy_order = self.exchange.get_order(buy_order_id)
                             log(f'Buy  {target} at {buy_order["price"]}(amount: {krw}, total: {self.exchange.get_total_balance()}) Debug - buy_cnt["{target}"] = {buy_cnt[target]}')
-                            buy_cnt[target] += 1
             except Exception as e:
                 log_path = './log'
                 log(str(e))
@@ -45,20 +47,22 @@ class AutoTradingAgent:
                 
             try:
                 # 매도 주문 넣기
-                selling_candidates = self.exchange.balance
+                selling_candidates = monitoring_target.union(self.exchange.balance)
                 for target in selling_candidates:
                     ohlcv = self.exchange.get_ohlcv_per_1m(target)
                     if ohlcv is None:
                         continue
-                    if self.exchange.balance[target]['total'] > 0 and (self._is_sell_timing(ohlcv) or self.exchange.is_plunge(item=target)):
-                        curr_price = self.exchange.get_current_price(item=target)
-                        amount_item = self.exchange.balance[target]['free']
-                        krw = curr_price * amount_item
-                        if krw > 6000:
-                            sell_order_id = self.exchange.create_sell_all_order_at_market_price(item=target)
-                            sell_order = self.exchange.get_order(sell_order_id)
-                            log(f'Sell {target} at {sell_order["price"]}({self.exchange.get_total_balance()})')
-                            buy_cnt[target] = 1
+                    if self._is_sell_timing(ohlcv) or self.exchange.is_plunge(item=target):
+                        buy_cnt[target] = 0
+                        if self.exchange.balance[target]['total'] > 0:
+                            curr_price = self.exchange.get_current_price(item=target)
+                            amount_item = self.exchange.balance[target]['free']
+                            krw = curr_price * amount_item
+                            if krw > 6000:
+                                sell_order_id = self.exchange.create_sell_all_order_at_market_price(item=target)
+                                sell_order = self.exchange.get_order(sell_order_id)
+                                log(f'Sell {target} at {sell_order["price"]}({self.exchange.get_total_balance()})')
+                                buy_cnt[target] = 1
             except Exception as e:
                 log_path = './log'
                 log(str(e))
