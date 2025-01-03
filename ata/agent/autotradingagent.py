@@ -1,4 +1,5 @@
 import traceback
+from time import time
 
 from ata.algorithm import trading
 from ata.exchange.baseexchange import BaseExchange
@@ -7,9 +8,11 @@ from ata.utils.log import log, save_log
 class AutoTradingAgent:
     def __init__(
         self,
-        exchange:BaseExchange
+        exchange:BaseExchange,
+        wait_buy_second
         ):
         self.exchange = exchange
+        self.wait_buy_second = wait_buy_second
         
     def run(self):
         log('run ATA...')
@@ -18,27 +21,30 @@ class AutoTradingAgent:
         self.exchange.init()
         log('trading start')
         monitoring_target = set()
+        start = time()
         while True:
             try:
                 if self.exchange.update() == False:
                     break
                 # 매수 주문 넣기
-                buying_candidates = monitoring_target.union(self.exchange.get_buying_candidates())
-                for target in buying_candidates:
-                    ohlcv = self.exchange.get_ohlcv_per_1m(target)
-                    if ohlcv is None:
-                        continue
-                    if self.exchange.balance['KRW']['total'] > 0 and self._is_buy_timing(ohlcv):
-                        monitoring_target.add(target)
-                        if not target in buy_cnt:
-                            buy_cnt[target] = 0
-                        buy_cnt[target] += 1
-                        buying_boundary = 1
-                        krw = min(max(6000, self.exchange.get_total_balance() / 5 * (buy_cnt[target] - buying_boundary)), self.exchange.balance['KRW']['free'] - 100)
-                        if buy_cnt[target] > buying_boundary and  krw > 6000:
-                            buy_order_id = self.exchange.create_buy_order_at_market_price(item=target, amount_krw=krw)
-                            buy_order = self.exchange.get_order(buy_order_id)
-                            log(f'Buy  {target} at {buy_order["price"]}(amount: {krw}, total: {self.exchange.get_total_balance()}) Debug - buy_cnt["{target}"] = {buy_cnt[target]}')
+                if time() - start > self.wait_buy_second:
+                    start = time()
+                    buying_candidates = monitoring_target.union(self.exchange.get_buying_candidates())
+                    for target in buying_candidates:
+                        ohlcv = self.exchange.get_ohlcv_per_1m(target)
+                        if ohlcv is None:
+                            continue
+                        if self.exchange.balance['KRW']['total'] > 0 and self._is_buy_timing(ohlcv):
+                            monitoring_target.add(target)
+                            if not target in buy_cnt:
+                                buy_cnt[target] = 0
+                            buy_cnt[target] += 1
+                            buying_boundary = 1
+                            krw = min(max(6000, self.exchange.get_total_balance() / 5 * (buy_cnt[target] - buying_boundary)), self.exchange.balance['KRW']['free'] - 100)
+                            if buy_cnt[target] > buying_boundary and  krw > 6000:
+                                buy_order_id = self.exchange.create_buy_order_at_market_price(item=target, amount_krw=krw)
+                                buy_order = self.exchange.get_order(buy_order_id)
+                                log(f'Buy  {target} at {buy_order["price"]}(amount: {krw}, total: {self.exchange.get_total_balance()}) Debug - buy_cnt["{target}"] = {buy_cnt[target]}')
             except Exception as e:
                 log_path = './log'
                 log(str(e))

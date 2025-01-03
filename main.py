@@ -25,6 +25,12 @@ def get_args():
         default=85000
     )
     
+    parser.add_argument(
+        '--wait-buy-second',
+        type=float,
+        default=60
+    )
+    
     return parser.parse_args()
 
 if __name__ == "__main__":
@@ -32,14 +38,17 @@ if __name__ == "__main__":
     
     if args.mod == "Offline":
         exchange = OfflineExchange(args.file_path)
+        wait_buy_second = 0
     elif args.mod == 'Upbit':
         exchange = UpbitExchange(
             end_condition=args.end_condition,
             file_path=args.file_path
         )
+        wait_buy_second = args.wait_buy_second
         
     agent = AutoTradingAgent(
-        exchange=exchange
+        exchange=exchange,
+        wait_buy_second=wait_buy_second
     )
     
     agent.run()
