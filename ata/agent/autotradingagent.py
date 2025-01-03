@@ -62,7 +62,7 @@ class AutoTradingAgent:
                         buy_cnt[target] = 0
                         if target in monitoring_target:
                             monitoring_target.remove(target)
-                        if self.exchange.balance[target]['total'] > 0:
+                        if target in self.exchange.balance:
                             curr_price = self.exchange.get_current_price(item=target)
                             amount_item = self.exchange.balance[target]['free']
                             krw = curr_price * amount_item
