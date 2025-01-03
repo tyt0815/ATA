@@ -54,6 +54,8 @@ class AutoTradingAgent:
                         continue
                     if self._is_sell_timing(ohlcv) or self.exchange.is_plunge(item=target):
                         buy_cnt[target] = 0
+                        if target in monitoring_target:
+                            monitoring_target.remove(target)
                         if self.exchange.balance[target]['total'] > 0:
                             curr_price = self.exchange.get_current_price(item=target)
                             amount_item = self.exchange.balance[target]['free']
