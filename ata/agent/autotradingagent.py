@@ -30,10 +30,10 @@ class AutoTradingAgent:
                 start = time.time()
                 buying_candidates = monitoring_target.union(self.exchange.get_buying_candidates())
                 for target in buying_candidates:
-                    ohlcv = self.exchange.get_ohlcv_per_1m(target)
-                    if ohlcv is None:
+                    ohlcv_per_1m = self.exchange.get_ohlcv_per_1m(target)
+                    if ohlcv_per_1m is None:
                         continue
-                    if self.exchange.balance['KRW']['total'] > 0 and self._is_buy_timing(ohlcv):
+                    if self.exchange.balance['KRW']['total'] > 0 and self._is_buy_timing(ohlcv_per_1m):
                         monitoring_target.add(target)
                         if not target in buy_cnt:
                             buy_cnt[target] = 0
@@ -50,10 +50,10 @@ class AutoTradingAgent:
                 # 매도 주문 넣기
                 selling_candidates = monitoring_target.union(self.exchange.balance)
                 for target in selling_candidates:
-                    ohlcv = self.exchange.get_ohlcv_per_1m(target)
-                    if ohlcv is None:
+                    ohlcv_per_1m = self.exchange.get_ohlcv_per_1m(target)
+                    if ohlcv_per_1m is None:
                         continue
-                    if self._is_sell_timing(ohlcv) or self.exchange.is_plunge(item=target):
+                    if self._is_sell_timing(ohlcv_per_1m) or self.exchange.is_plunge(item=target):
                         buy_cnt[target] = 0
                         if target in monitoring_target:
                             monitoring_target.remove(target)
@@ -104,46 +104,52 @@ class AutoTradingAgent:
         log('end trading')
         return
                 
-    def _is_buy_timing(self, ohlcv):
+    def _is_buy_timing(self, ohlcv_per_1m):
         # 볼린저
         bollinger_period = 20
         bollinger_num_std_dev = 2
-        ohlcv = trading.calc_bollinger_bands(df=ohlcv, period=bollinger_period, num_std_dev=bollinger_num_std_dev)
+        ohlcv_per_1m = trading.calc_bollinger_bands(df=ohlcv_per_1m, period=bollinger_period, num_std_dev=bollinger_num_std_dev)
+        
+        # 급락시에는 매수를 하지 않는다
+        y1 = ohlcv_per_1m['high'].iloc[-2]
+        y2 = ohlcv_per_1m['low'].iloc[-1]
+        if (y2 - y1) / y1 < -0.1:
+            return False
         
         # 가격이 볼린저 밴드 하단을 터치치하였는가
-        if ohlcv[f"lower_band{bollinger_period}_{bollinger_num_std_dev}"].iloc[-1] < ohlcv["close"].iloc[-1]:
+        if ohlcv_per_1m[f"lower_band{bollinger_period}_{bollinger_num_std_dev}"].iloc[-1] < ohlcv_per_1m["close"].iloc[-1]:
             return False
         
         # 볼린저 %b가 0이하인가
-        if ohlcv[f"bollinger_b{bollinger_period}_{bollinger_num_std_dev}"].iloc[-1] > 0:
+        if ohlcv_per_1m[f"bollinger_b{bollinger_period}_{bollinger_num_std_dev}"].iloc[-1] > 0:
             return False
         
         # mfi가 20이하인가
         mfi_peirod = 14
-        ohlcv = trading.calc_mfi(df=ohlcv, period=mfi_peirod)
-        if ohlcv[f'mfi{mfi_peirod}'].iloc[-1] > 20:
+        ohlcv_per_1m = trading.calc_mfi(df=ohlcv_per_1m, period=mfi_peirod)
+        if ohlcv_per_1m[f'mfi{mfi_peirod}'].iloc[-1] > 20:
             return False
         
         return True
     
-    def _is_sell_timing(self, ohlcv):
+    def _is_sell_timing(self, ohlcv_per_1m):
         # 볼린저
         bollinger_period = 20
         bollinger_num_std_dev = 2
-        ohlcv = trading.calc_bollinger_bands(df=ohlcv, period=bollinger_period, num_std_dev=bollinger_num_std_dev)
+        ohlcv_per_1m = trading.calc_bollinger_bands(df=ohlcv_per_1m, period=bollinger_period, num_std_dev=bollinger_num_std_dev)
         
         # 가격이 볼린저 밴드 상단을 터치하였는가
-        if ohlcv[f"upper_band{bollinger_period}_{bollinger_num_std_dev}"].iloc[-1] > ohlcv["close"].iloc[-1]:
+        if ohlcv_per_1m[f"upper_band{bollinger_period}_{bollinger_num_std_dev}"].iloc[-1] > ohlcv_per_1m["close"].iloc[-1]:
             return False
         
         # 볼린저 %b가 1이상인가
-        if ohlcv[f"bollinger_b{bollinger_period}_{bollinger_num_std_dev}"].iloc[-1] < 1:
+        if ohlcv_per_1m[f"bollinger_b{bollinger_period}_{bollinger_num_std_dev}"].iloc[-1] < 1:
             return False
         
         # mfi가 80이상인가
         mfi_peirod = 14
-        ohlcv = trading.calc_mfi(df=ohlcv, period=mfi_peirod)
-        if ohlcv[f'mfi{mfi_peirod}'].iloc[-1] < 80:
+        ohlcv_per_1m = trading.calc_mfi(df=ohlcv_per_1m, period=mfi_peirod)
+        if ohlcv_per_1m[f'mfi{mfi_peirod}'].iloc[-1] < 80:
             return False
         
         return True

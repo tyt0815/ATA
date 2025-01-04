@@ -27,6 +27,7 @@ class OfflineExchange(BaseExchange):
         self.ohlcv_per_15m = None
         self.end_condition = self.balance['KRW']['total'] * 0.9
         self.__order = {}
+        self.__ohlcv_len = 30
         
         offset = 300
         assert offset <= len(self.data), f"error: not enough offline data ({offset} {len(self.data)})"
@@ -43,10 +44,10 @@ class OfflineExchange(BaseExchange):
         if len(self.data) <= self.idx:
             return False
         
-        self.ohlcv_per_1m = self.data[max(self.idx + 1 - 20, 0):self.idx + 1].copy()
+        self.ohlcv_per_1m = self.data[max(self.idx + 1 - self.__ohlcv_len, 0):self.idx + 1].copy()
         columns_to_resample = ['open', 'high', 'low', 'close', 'volume']
         
-        temp_data = self.data[columns_to_resample].iloc[max(self.idx + 1 - 300, 0):self.idx + 1]
+        temp_data = self.data[columns_to_resample].iloc[max(self.idx + 1 - (15 * self.__ohlcv_len), 0):self.idx + 1]
         group = temp_data.index // 15
         self.ohlcv_per_15m = (
             temp_data
