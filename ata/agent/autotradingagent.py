@@ -63,8 +63,9 @@ class AutoTradingAgent:
                                 sell_cnt[target] = 0
                             sell_cnt[target] += 1 
                             curr_price = self.exchange.get_current_price(item=target)
-                            h = min(2, sell_cnt[target]) / 2.0
-                            amount_item = self.exchange.balance[target]['free']  * h
+                            denominator = 2.0
+                            weight = min(denominator, sell_cnt[target]) / denominator
+                            amount_item = self.exchange.balance[target]['free']  * weight
                             krw = curr_price * amount_item
                             if krw > 6000:
                                 sell_order_id = self.exchange.create_sell_order_at_market_price(item=target, amount_item=amount_item)
