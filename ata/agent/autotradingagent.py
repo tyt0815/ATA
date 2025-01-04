@@ -1,5 +1,5 @@
 import traceback
-from time import time
+import time
 
 from ata.algorithm import trading
 from ata.exchange.baseexchange import BaseExchange
@@ -9,49 +9,45 @@ class AutoTradingAgent:
     def __init__(
         self,
         exchange:BaseExchange,
-        wait_buy_second
+        wait_second
         ):
         self.exchange = exchange
-        self.wait_buy_second = wait_buy_second
+        self.wait_second = wait_second
         
     def run(self):
         log('run ATA...')
         buy_cnt = {}
+        sell_cnt = {}
         # 거래 루프
         self.exchange.init()
         log('trading start')
         monitoring_target = set()
-        start = time()
+        processing_time = self.wait_second
         while True:
             try:
                 if self.exchange.update() == False:
                     break
                 # 매수 주문 넣기
-                if time() - start > self.wait_buy_second:
-                    start = time()
-                    buying_candidates = monitoring_target.union(self.exchange.get_buying_candidates())
-                    for target in buying_candidates:
-                        ohlcv = self.exchange.get_ohlcv_per_1m(target)
-                        if ohlcv is None:
-                            continue
-                        if self.exchange.balance['KRW']['total'] > 0 and self._is_buy_timing(ohlcv):
-                            monitoring_target.add(target)
-                            if not target in buy_cnt:
-                                buy_cnt[target] = 0
-                            buy_cnt[target] += 1
-                            buying_boundary = 1
-                            krw = min(max(6000, self.exchange.get_total_balance() / 5 * (buy_cnt[target] - buying_boundary)), self.exchange.balance['KRW']['free'] - 100)
-                            if buy_cnt[target] > buying_boundary and  krw > 6000:
-                                buy_order_id = self.exchange.create_buy_order_at_market_price(item=target, amount_krw=krw)
-                                buy_order = self.exchange.get_order(buy_order_id)
-                                log(f'Buy  {target} at {buy_order["price"]}(amount: {krw}, total: {self.exchange.get_total_balance()}) Debug - buy_cnt["{target}"] = {buy_cnt[target]}')
-            except Exception as e:
-                log_path = './log'
-                log(str(e))
-                save_log(content=traceback.format_exc(), file_path=log_path)
-                self.exchange.init()
-                
-            try:
+                time.sleep(max(0, self.wait_second - processing_time))
+                start = time.time()
+                buying_candidates = monitoring_target.union(self.exchange.get_buying_candidates())
+                for target in buying_candidates:
+                    ohlcv = self.exchange.get_ohlcv_per_1m(target)
+                    if ohlcv is None:
+                        continue
+                    if self.exchange.balance['KRW']['total'] > 0 and self._is_buy_timing(ohlcv):
+                        monitoring_target.add(target)
+                        if not target in buy_cnt:
+                            buy_cnt[target] = 0
+                        buy_cnt[target] += 1
+                        sell_cnt[target] = 0
+                        buying_boundary = 1
+                        krw = min(max(6000, self.exchange.get_total_balance() / 5 * (buy_cnt[target] - buying_boundary)), self.exchange.balance['KRW']['free'] - 100)
+                        if buy_cnt[target] > buying_boundary and  krw > 6000:
+                            buy_order_id = self.exchange.create_buy_order_at_market_price(item=target, amount_krw=krw)
+                            buy_order = self.exchange.get_order(buy_order_id)
+                            log(f'Buy  {target} at {buy_order["price"]}(amount: {krw}, total: {self.exchange.get_total_balance()}) Debug - buy_cnt["{target}"] = {buy_cnt[target]}')
+            
                 # 매도 주문 넣기
                 selling_candidates = monitoring_target.union(self.exchange.balance)
                 for target in selling_candidates:
@@ -63,19 +59,25 @@ class AutoTradingAgent:
                         if target in monitoring_target:
                             monitoring_target.remove(target)
                         if target in self.exchange.balance:
+                            if not target in sell_cnt:
+                                sell_cnt[target] = 0
+                            sell_cnt[target] += 1 
                             curr_price = self.exchange.get_current_price(item=target)
-                            amount_item = self.exchange.balance[target]['free']
+                            amount_item = self.exchange.balance[target]['free'] / 3 * min(3, sell_cnt[target])
                             krw = curr_price * amount_item
                             if krw > 6000:
-                                sell_order_id = self.exchange.create_sell_all_order_at_market_price(item=target)
+                                sell_order_id = self.exchange.create_sell_order_at_market_price(item=target, amount_item=amount_item)
                                 sell_order = self.exchange.get_order(sell_order_id)
                                 log(f'Sell {target} at {sell_order["price"]}({self.exchange.get_total_balance()})')
                                 buy_cnt[target] = 1
+                processing_time = time.time() - start
             except Exception as e:
                 log_path = './log'
                 log(str(e))
                 save_log(content=traceback.format_exc(), file_path=log_path)
                 self.exchange.init()
+                processing_time = self.wait_second
+            
                 
         self._end_trading()
             
