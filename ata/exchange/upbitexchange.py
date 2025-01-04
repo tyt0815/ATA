@@ -49,16 +49,20 @@ class UpbitExchange(BaseExchange):
         return True
     
     def get_buying_candidates(self):
-        return ['BTC']
         symbols = self.tickers.keys()
         krw_symbols = [x for x in symbols if x.endswith('KRW')]
         buying_candidates = []
         low_percentage = -0.05
         high_percentage = max(0.05, self.tickers['BTC/KRW']['percentage'])
+        btc_acc_trade_price = float(self.tickers['BTC/KRW']['info']['acc_trade_price'])
         for symbol in krw_symbols:
             ticker = self.tickers[symbol]
             percentage = ticker['percentage']
-            if float(ticker['info']['acc_trade_price_24h']) > 100000000000 and percentage >= low_percentage and percentage < high_percentage:
+            if (
+                float(ticker['info']['acc_trade_price']) > btc_acc_trade_price * 0.85 and 
+                float(ticker['info']['acc_trade_price']) < btc_acc_trade_price * 1.15 and 
+                percentage >= low_percentage and percentage < high_percentage
+                ):
                 buying_candidates.append(symbol.split('/')[0])
         return buying_candidates
     
