@@ -1,3 +1,5 @@
+from collections import deque
+import numpy as np
 import traceback
 import time
 
@@ -18,6 +20,7 @@ class AutoTradingAgent:
         log('run ATA...')
         buy_cnt = {}
         sell_cnt = {}
+        buy_cnt_histories = {}
         # 거래 루프
         self.exchange.init()
         log('trading start')
@@ -33,19 +36,21 @@ class AutoTradingAgent:
                     ohlcv_per_1m = self.exchange.get_ohlcv_per_1m(target)
                     if ohlcv_per_1m is None:
                         continue
-                    if self.exchange.balance['KRW']['total'] > 0 and self._is_buy_timing(ohlcv_per_1m):
+                    if self._is_buy_timing(ohlcv_per_1m):
                         monitoring_target.add(target)
                         if not target in buy_cnt:
                             buy_cnt[target] = 0
                         buy_cnt[target] += 1
                         sell_cnt[target] = 0
-                        buy_skip_criterion = 1
+                        if not target in buy_cnt_histories:
+                            continue
+                        buy_skip_criterion = np.median(buy_cnt_histories[target]) - 1
                         if buy_cnt[target] > buy_skip_criterion:
                             krw = min(self.exchange.get_total_balance() / 5 * (buy_cnt[target] - buy_skip_criterion), self.exchange.balance['KRW']['free'] - 100)
                             if krw > 6000:
                                 buy_order_id = self.exchange.create_buy_order_at_market_price(item=target, amount_krw=krw)
                                 buy_order = self.exchange.get_order(buy_order_id)
-                                log(f'Buy  {target} at {buy_order["price"]}(amount: {krw}, total: {self.exchange.get_total_balance()})')
+                                log(f'Buy  {target} at {buy_order["price"]:>12}(amount: {int(krw):>7}, total: {int(self.exchange.get_total_balance()):>7}) Debug - buy_cnt["{target}"] = {buy_cnt[target]}')
             
                 # 매도 주문 넣기
                 selling_candidates = monitoring_target.union(self.exchange.balance)
@@ -54,6 +59,11 @@ class AutoTradingAgent:
                     if ohlcv_per_1m is None:
                         continue
                     if self._is_sell_timing(ohlcv_per_1m) or self.exchange.is_plunge(item=target):
+                        if target in buy_cnt_histories:
+                            if buy_cnt[target] > 0:
+                                buy_cnt_histories[target].append(buy_cnt[target])
+                        elif target in buy_cnt:
+                            buy_cnt_histories[target] = deque([buy_cnt[target]], maxlen=3)
                         buy_cnt[target] = 0
                         if target in monitoring_target:
                             monitoring_target.remove(target)
@@ -71,7 +81,7 @@ class AutoTradingAgent:
                                 if krw > 6000:
                                     sell_order_id = self.exchange.create_sell_order_at_market_price(item=target, amount_item=amount_item)
                                     sell_order = self.exchange.get_order(sell_order_id)
-                                    log(f'Sell {target} at {sell_order["price"]}(amount: {krw}, total: {self.exchange.get_total_balance()})')
+                                    log(f'Sell {target} at {sell_order["price"]:>12}(amount: {int(krw):>7}, total: {int(self.exchange.get_total_balance()):>7})')
                                     buy_cnt[target] = 1
                 processing_time = time.time() - start
                 if self.wait_a_minute:
