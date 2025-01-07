@@ -49,17 +49,18 @@ class UpbitExchange(BaseExchange):
         return True
     
     def get_buying_candidates(self):
-        symbols = self.tickers.keys()
-        krw_symbols = [x for x in symbols if x.endswith('KRW')]
-        buying_candidates = []
-        low_percentage = -0.05
-        high_percentage = max(0.05, self.tickers['BTC/KRW']['percentage'])
-        for symbol in krw_symbols:
-            ticker = self.tickers[symbol]
-            percentage = ticker['percentage']
-            if float(ticker['info']['acc_trade_price_24h']) > 100000000000 and percentage >= low_percentage and percentage < high_percentage:
-                buying_candidates.append(symbol.split('/')[0])
-        return buying_candidates
+        return ['BTC']
+        # symbols = self.tickers.keys()
+        # krw_symbols = [x for x in symbols if x.endswith('KRW')]
+        # buying_candidates = []
+        # low_percentage = -0.05
+        # high_percentage = max(0.05, self.tickers['BTC/KRW']['percentage'])
+        # for symbol in krw_symbols:
+        #     ticker = self.tickers[symbol]
+        #     percentage = ticker['percentage']
+        #     if float(ticker['info']['acc_trade_price_24h']) > 100000000000 and percentage >= low_percentage and percentage < high_percentage:
+        #         buying_candidates.append(symbol.split('/')[0])
+        # return buying_candidates
     
     def is_plunge(self, item):
         ticker = self.tickers[item+'/KRW']
