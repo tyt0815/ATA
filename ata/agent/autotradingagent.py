@@ -34,9 +34,10 @@ class AutoTradingAgent:
                 buying_candidates = monitoring_target.union(self.exchange.get_buying_candidates())
                 for target in buying_candidates:
                     ohlcv_per_1m = self.exchange.get_ohlcv_per_1m(target)
+                    ohlcv_per_1h = self.exchange.get_ohlcv_per_1h(target)
                     if ohlcv_per_1m is None:
                         continue
-                    if self._is_buy_timing(ohlcv_per_1m):
+                    if self._is_buy_timing(ohlcv_per_1m, ohlcv_per_1h):
                         monitoring_target.add(target)
                         if not target in buy_cnt:
                             buy_cnt[target] = 0
@@ -114,58 +115,8 @@ class AutoTradingAgent:
         log('end trading')
         return
                 
-    def _is_buy_timing(self, ohlcv_per_1m):
-        # 볼린저
-        bollinger_period = 20
-        bollinger_num_std_dev = 2
-        ohlcv_per_1m, keys = trading.calc_bollinger_bands(df=ohlcv_per_1m, period=bollinger_period, num_std_dev=bollinger_num_std_dev)
-        upper_key = keys['upper_key']
-        lower_key = keys['lower_key']
-        b_key = keys['b_key']
-        
-        # 급락시에는 매수를 하지 않는다
-        y1 = ohlcv_per_1m['high'].iloc[-2]
-        y2 = ohlcv_per_1m['low'].iloc[-1]
-        if (y2 - y1) / y1 < -0.1:
-            return False
-        
-        # 가격이 볼린저 밴드 하단을 터치치하였는가
-        if ohlcv_per_1m[lower_key].iloc[-1] < ohlcv_per_1m["close"].iloc[-1]:
-            return False
-        
-        # 볼린저 %b가 0이하인가
-        if ohlcv_per_1m[b_key].iloc[-1] > 0:
-            return False
-        
-        # mfi가 20이하인가
-        mfi_peirod = 14
-        ohlcv_per_1m, mfi_key = trading.calc_mfi(df=ohlcv_per_1m, period=mfi_peirod)
-        if ohlcv_per_1m[mfi_key].iloc[-1] > 20:
-            return False
-        
-        return True
+    def _is_buy_timing(self, ohlcv_per_1m, ohlcv_per_1h):
+        return trading.check_oversold_by_bollinger_mfi(ohlcv_per_1m)
     
     def _is_sell_timing(self, ohlcv_per_1m):
-        # 볼린저
-        bollinger_period = 20
-        bollinger_num_std_dev = 2
-        ohlcv_per_1m, keys = trading.calc_bollinger_bands(df=ohlcv_per_1m, period=bollinger_period, num_std_dev=bollinger_num_std_dev)
-        upper_key = keys['upper_key']
-        lower_key = keys['lower_key']
-        b_key = keys['b_key']
-        
-        # 가격이 볼린저 밴드 상단을 터치하였는가
-        if ohlcv_per_1m[upper_key].iloc[-1] > ohlcv_per_1m["close"].iloc[-1]:
-            return False
-        
-        # 볼린저 %b가 1이상인가
-        if ohlcv_per_1m[b_key].iloc[-1] < 1:
-            return False
-        
-        # mfi가 80이상인가
-        mfi_peirod = 14
-        ohlcv_per_1m, mfi_key = trading.calc_mfi(df=ohlcv_per_1m, period=mfi_peirod)
-        if ohlcv_per_1m[mfi_key].iloc[-1] < 80:
-            return False
-        
-        return True
+        return trading.check_overbought_by_bollinger_mfi(ohlcv_per_1m)

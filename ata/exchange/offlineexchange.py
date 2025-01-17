@@ -45,20 +45,8 @@ class OfflineExchange(BaseExchange):
             return False
         
         self.ohlcv_per_1m = self.data[max(self.idx + 1 - self.__ohlcv_len, 0):self.idx + 1].copy()
-        columns_to_resample = ['open', 'high', 'low', 'close', 'volume']
-        
-        temp_data = self.data[columns_to_resample].iloc[max(self.idx + 1 - (15 * self.__ohlcv_len), 0):self.idx + 1]
-        group = temp_data.index // 15
-        self.ohlcv_per_15m = (
-            temp_data
-            .groupby(group)
-            .agg({
-                'open': 'first',
-                'high': 'max',
-                'low': 'min',
-                'close': 'last',
-                'volume': 'sum'
-        }).reset_index(drop=True)).copy()  # 그룹 컬럼 제거
+        self.ohlcv_per_15m = self.__to_per_minute(15)
+        self.ohlcv_per_1h = self.__to_per_minute(60)
         
         if self.get_total_balance() < self.end_condition:
             return False
@@ -106,6 +94,11 @@ class OfflineExchange(BaseExchange):
             return None
         return self.ohlcv_per_15m
     
+    def get_ohlcv_per_1h(self, item):
+        if item == 'KRW':
+            return None
+        return self.ohlcv_per_1h
+    
     def get_total_balance(self):
         return self.balance['KRW']['total'] + self.balance['BTC']['total'] * self.get_current_price('BTC')
     
@@ -123,3 +116,18 @@ class OfflineExchange(BaseExchange):
         self.__id_cnt += 1
         self.__order[order_id] = {'status': status, 'side': side, 'price': price, 'amount': amount, 'filled': filled, 'id': order_id}
         return order_id
+    
+    def __to_per_minute(self, minute):
+        columns_to_resample = ['open', 'high', 'low', 'close', 'volume']
+        temp_data = self.data[columns_to_resample].iloc[max(self.idx + 1 - (minute * self.__ohlcv_len), 0):self.idx + 1]
+        group = temp_data.index // minute
+        return (
+            temp_data
+            .groupby(group)
+            .agg({
+                'open': 'first',
+                'high': 'max',
+                'low': 'min',
+                'close': 'last',
+                'volume': 'sum'
+        }).reset_index(drop=True)).copy()  # 그룹 컬럼 제거

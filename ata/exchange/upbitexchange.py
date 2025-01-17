@@ -41,6 +41,7 @@ class UpbitExchange(BaseExchange):
     def update(self) -> bool:
         self.ohlcvs_1m = {}
         self.ohlcvs_15m = {}
+        self.ohlcvs_1h = {}
         self.balance = self.exchange.fetch_balance()
         self.tickers = self.exchange.fetch_tickers()
         if self.get_total_balance() < self.end_condition:
@@ -125,6 +126,18 @@ class UpbitExchange(BaseExchange):
             except:
                 return None
         return self.ohlcvs_15m[item]
+    
+    def get_ohlcv_per_1h(self, item):
+        if not item in self.ohlcvs_1h:
+            try:
+                ohlcv = self.exchange.fetch_ohlcv(
+                    symbol=f'{item}/KRW',
+                    timeframe='1h'
+                )
+                self.ohlcvs_1h[item] = self.__preprocess_ohlcv(ohlcv)
+            except:
+                return None
+        return self.ohlcvs_1h[item]
     
     def get_total_balance(self):
         total = 0

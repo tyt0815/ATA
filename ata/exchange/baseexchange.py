@@ -59,6 +59,10 @@ class BaseExchange:
         pass
     
     @abstractmethod
+    def get_ohlcv_per_1h(self, item):
+        pass
+
+    @abstractmethod
     def get_total_balance(self):
         pass
     
