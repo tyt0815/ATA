@@ -50,8 +50,8 @@ class UpbitExchange(BaseExchange):
         self.ohlcvs_1h = {}
         self.balance = self.exchange.fetch_balance()
         self.tickers = self.exchange.fetch_tickers()
-        if self.end_condition < 1.0:
-            self.end_value = max(self.end_value, self.get_total_balance() * self.end_condition)
+        if self.end_condition < 1.0 and self.end_value < self.get_total_balance() * self.end_condition:
+            self.end_value = self.get_total_balance() * self.end_condition
             log(f'update end_value: {self.end_value}')
         if self.get_total_balance() < self.end_value:
             return False
