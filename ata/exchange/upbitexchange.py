@@ -12,6 +12,7 @@ class UpbitExchange(BaseExchange):
         ):
         super().__init__()
         self.end_condition = end_condition
+        self.end_value = None
         self.file_path = file_path
     
     def init(self):
@@ -35,6 +36,12 @@ class UpbitExchange(BaseExchange):
                 log('login fail')
         
         self.update()
+        if self.end_value is None:
+            if self.end_condition >= 1.0:
+                self.end_value = self.end_condition
+            else:
+                self.end_value = self.get_total_balance() * self.end_condition
+        log(f'end_value: {self.end_value}')
         log('done')
         return True
     
@@ -44,7 +51,10 @@ class UpbitExchange(BaseExchange):
         self.ohlcvs_1h = {}
         self.balance = self.exchange.fetch_balance()
         self.tickers = self.exchange.fetch_tickers()
-        if self.get_total_balance() < self.end_condition:
+        if self.end_condition < 1.0:
+            self.end_value = max(self.end_value, self.get_total_balance() * self.end_condition)
+            log(f'update end_value: {self.end_value}')
+        if self.get_total_balance() < self.end_value:
             return False
         
         return True

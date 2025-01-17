@@ -21,8 +21,8 @@ def get_args():
     
     parser.add_argument(
         '--end-condition',
-        type=int,
-        default=50000
+        type=float,
+        default=0.7
     )
     
     return parser.parse_args()
