@@ -2,7 +2,7 @@ import ccxt
 import pandas as pd
 
 from ata.exchange.baseexchange import BaseExchange
-from ata.utils.log import log
+from ata.utils.log import log    
 
 class UpbitExchange(BaseExchange):
     def __init__(

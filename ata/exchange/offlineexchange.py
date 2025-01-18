@@ -27,6 +27,7 @@ class OfflineExchange(BaseExchange):
         self.ohlcv_per_15m = None
         self.end_condition = self.balance['KRW']['total'] * 0.9
         self.__order = {}
+        self.__open_order_id = []
         self.__ohlcv_len = 30
         
         offset = 300
@@ -51,6 +52,9 @@ class OfflineExchange(BaseExchange):
         if self.get_total_balance() < self.end_condition:
             return False
         
+        for order_id in self.__open_order_id:
+            self.__process_order(order_id)
+        
         return True
     
     def get_buying_candidates(self):
@@ -60,11 +64,10 @@ class OfflineExchange(BaseExchange):
         krw = min(price * amount_item, self.balance['KRW']['free'])
         if krw > self.balance['KRW']['free']: 
             raise Exception(f'KRW 초과(request: {krw}, remained: {self.balance["KRW"]["free"]})')
-        self.balance['BTC']['free'] += amount_item
-        self.balance['BTC']['total'] += amount_item
         self.balance['KRW']['free'] -= krw
-        self.balance['KRW']['total'] -= krw
-        return self.__make_order(item, status='closed', side='bid', price=price, amount=amount_item, filled=amount_item)
+        order_id = self.__make_order(item, status='open', side='bid', price=price, amount=amount_item, filled=amount_item)
+        self.__process_order(order_id)
+        return order_id
     
     def create_buy_order_at_market_price(self, item, amount_krw):
         curr_price = self.get_current_price(item=item)
@@ -75,11 +78,10 @@ class OfflineExchange(BaseExchange):
         krw = price * amount_item
         if amount_item > self.balance[item]['free']:
             raise Exception(f'{item} 부족(request: {amount_item}, remained: {self.balance[item]["free"]})')
-        self.balance['KRW']['free'] += krw
-        self.balance['KRW']['total'] += krw
         self.balance['BTC']['free'] -= amount_item
-        self.balance['BTC']['total'] -= amount_item
-        return self.__make_order(item, status='closed', side='ask', price=price, amount=amount_item, filled=amount_item)
+        order_id = self.__make_order(item, status='open', side='ask', price=price, amount=amount_item, filled=amount_item)
+        self.__process_order(order_id)
+        return order_id
     
     def create_sell_order_at_market_price(self, item, amount_item):
         return self.create_sell_order(item=item, price=self.get_current_price(item=item), amount_item=amount_item)
@@ -115,6 +117,8 @@ class OfflineExchange(BaseExchange):
         order_id = f'{self.__id_cnt}'
         self.__id_cnt += 1
         self.__order[order_id] = {'status': status, 'side': side, 'price': price, 'amount': amount, 'filled': filled, 'id': order_id}
+        if status == 'open':
+            self.__open_order_id.append(order_id)
         return order_id
     
     def __to_per_minute(self, minute):
@@ -131,3 +135,24 @@ class OfflineExchange(BaseExchange):
                 'close': 'last',
                 'volume': 'sum'
         }).reset_index(drop=True)).copy()  # 그룹 컬럼 제거
+        
+    def __process_order(self, order_id):
+        order = self.__order[order_id]
+        if order['status'] != 'closed':
+            # 매수 주문
+            if order['side'] == 'bid' and order['price'] <= self.get_current_price('BTC'):
+                self.balance['BTC']['free'] += order['amount']
+                self.balance['BTC']['total'] += order['amount']
+                self.balance['KRW']['total'] -= order['amount'] * order['price']
+                order['filled'] = order['amount']
+                order['status'] = 'closed'
+                self.__open_order_id.remove(order_id)
+            
+            # 매도 주문    
+            elif order['side'] == 'ask' and order['price'] >= self.get_current_price('BTC'):
+                self.balance['KRW']['free'] += order['amount'] * order['price']
+                self.balance['KRW']['total'] += order['amount'] * order['price']
+                self.balance['BTC']['total'] -= order['amount']
+                order['filled'] = order['amount']
+                order['status'] = 'closed'
+                self.__open_order_id.remove(order_id)
