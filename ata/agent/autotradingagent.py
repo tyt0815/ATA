@@ -23,9 +23,11 @@ class AutoTradingAgent:
         sell_cnt = {}
         buy_cnt_histories = {}
         buy_order_ids = {}
+        sell_order_ids = {}
         buy_diffs = {}
         buy_first = {}
         buy_last = {}
+        
         # 거래 루프
         self.exchange.init()
         log('trading start')
@@ -34,6 +36,19 @@ class AutoTradingAgent:
             try:
                 if self.exchange.update() == False:
                     break
+                for target in sell_order_ids:
+                    for sell_order_id in sell_order_ids[target]:
+                        order = self.exchange.get_order(sell_order_id)
+                        if order['status'] == 'closed':
+                            log(f'Sell {target} at {order["price"]:>12}(amount: {order["price"] * order["amount"]:>7}, total: {int(self.exchange.get_total_balance()):>7}, current_price{self.exchange.get_current_price(item=target):>12})')
+                        else:
+                            self.exchange.cancel_order_by_id(order_id=sell_order_id)
+                            log(f'Cancel {target} sell order(amount_krw: {(order["amount"] - order["filled"]) * order["price"]}, price: {order["price"]}, amount: {order["amount"]}, filled: {order["filled"]})')
+                            market_sell_id = self.exchange.create_sell_order_at_market_price(item=target, amount_item=order['amount'] - order['filled'])
+                            market_order = self.exchange.get_order(market_sell_id)
+                            log(f'Sell {target} at market price {market_order["price"]:>12}(amount: {market_order["price"] * market_order["amount"]:>7}, total: {int(self.exchange.get_total_balance()):>7}, current_price{self.exchange.get_current_price(item=target):>12})')
+                        sell_order_ids[target].remove(sell_order_id)
+                            
                 # 매수 주문 넣기
                 start = time.time()
                 buying_candidates = monitoring_target.union(self.exchange.get_buying_candidates())
@@ -127,12 +142,17 @@ class AutoTradingAgent:
                                 denominator = 2.0
                                 weight = min(denominator, sell_cnt[target] - sell_skip_criterion) / denominator
                                 amount_item = self.exchange.balance[target]['free']  * weight
-                                krw = curr_price * amount_item
+                                unit = upbit_price_unit(item=target, price=curr_price)
+                                sell_price = curr_price + unit * max(0, 2 + (sell_skip_criterion - sell_cnt[target]))
+                                krw = sell_price * amount_item
                                 if krw > 6000:
-                                    sell_order_id = self.exchange.create_sell_order_at_market_price(item=target, amount_item=amount_item)
+                                    sell_order_id = self.exchange.create_sell_order(item=target, price=sell_price, amount_item=amount_item)
+                                    if target not in sell_order_ids:
+                                        sell_order_ids[target] = []
+                                    sell_order_ids[target].append(sell_order_id)
                                     sell_order = self.exchange.get_order(sell_order_id)
-                                    log(f'Sell {target} at {sell_order["price"]:>12}(amount: {int(krw):>7}, total: {int(self.exchange.get_total_balance()):>7}, current_price{self.exchange.get_current_price(item=target):>12})')
-                                    buy_cnt[target] = 1
+                                    log(f'Sell order {target} at {sell_order["price"]:>12}(amount: {sell_order["price"] * sell_order["amount"]:>7}, total: {int(self.exchange.get_total_balance()):>7}, current_price{self.exchange.get_current_price(item=target):>12})')
+                                    
                 processing_time = time.time() - start
                 if self.wait_a_minute:
                     time.sleep(60 - processing_time)

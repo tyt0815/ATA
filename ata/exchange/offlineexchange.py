@@ -41,9 +41,6 @@ class OfflineExchange(BaseExchange):
         return True
     
     def update(self) -> bool:
-        for order_id in self.__open_order_id:
-            self.__process_order(order_id)
-        
         self.idx += 1
         if len(self.data) <= self.idx:
             return False
@@ -51,6 +48,9 @@ class OfflineExchange(BaseExchange):
         self.ohlcv_per_1m = self.data[max(self.idx + 1 - self.__ohlcv_len, 0):self.idx + 1].copy()
         self.ohlcv_per_15m = self.__to_per_minute(15)
         self.ohlcv_per_1h = self.__to_per_minute(60)
+
+        for order_id in self.__open_order_id:
+            self.__process_order(order_id)
         
         if self.get_total_balance() < self.end_condition:
             return False
