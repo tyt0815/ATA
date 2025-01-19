@@ -41,6 +41,9 @@ class OfflineExchange(BaseExchange):
         return True
     
     def update(self) -> bool:
+        for order_id in self.__open_order_id:
+            self.__process_order(order_id)
+        
         self.idx += 1
         if len(self.data) <= self.idx:
             return False
@@ -52,21 +55,18 @@ class OfflineExchange(BaseExchange):
         if self.get_total_balance() < self.end_condition:
             return False
         
-        for order_id in self.__open_order_id:
-            self.__process_order(order_id)
-        
         return True
     
     def get_buying_candidates(self):
         return ['BTC']
     
     def create_buy_order(self, item, price, amount_item):
-        krw = min(price * amount_item, self.balance['KRW']['free'])
+        krw = price * amount_item
         if krw > self.balance['KRW']['free']: 
             raise Exception(f'KRW 초과(request: {krw}, remained: {self.balance["KRW"]["free"]})')
         self.balance['KRW']['free'] -= krw
-        order_id = self.__make_order(item, status='open', side='bid', price=price, amount=amount_item, filled=amount_item)
-        self.__process_order(order_id)
+        self.balance['KRW']['used'] += krw
+        order_id = self.__make_order(item, status='open', side='bid', price=price, amount=amount_item, filled=0)
         return order_id
     
     def create_buy_order_at_market_price(self, item, amount_krw):
@@ -74,13 +74,11 @@ class OfflineExchange(BaseExchange):
         return self.create_buy_order(item=item, price=curr_price,amount_item=amount_krw / curr_price)
     
     def create_sell_order(self, item, price, amount_item):
-        amount_item = min(amount_item, self.balance[item]['free'])
-        krw = price * amount_item
         if amount_item > self.balance[item]['free']:
             raise Exception(f'{item} 부족(request: {amount_item}, remained: {self.balance[item]["free"]})')
         self.balance['BTC']['free'] -= amount_item
-        order_id = self.__make_order(item, status='open', side='ask', price=price, amount=amount_item, filled=amount_item)
-        self.__process_order(order_id)
+        self.balance['BTC']['used'] += amount_item
+        order_id = self.__make_order(item, status='open', side='ask', price=price, amount=amount_item, filled=0)
         return order_id
     
     def create_sell_order_at_market_price(self, item, amount_item):
@@ -108,7 +106,20 @@ class OfflineExchange(BaseExchange):
         return self.__order[order_id]
     
     def cancel_order_by_id(self, order_id):
-        pass
+        if order_id in self.__open_order_id:
+            self.__open_order_id.remove(order_id)
+            order = self.get_order(order_id=order_id)
+            if order['status'] == 'open':
+                order['status'] = 'canceled'
+                # 매수 
+                if order['side'] == 'bid':
+                    amount_krw = order['amount'] * order['price']
+                    self.balance['KRW']['free'] += amount_krw
+                    self.balance['KRW']['used'] -= amount_krw
+                else:
+                    self.balance['BTC']['free'] += order['amount']
+                    self.balance['BTC']['used'] -= order['amount']
+            
     
     def cancel_order_all(self):
         pass
@@ -138,21 +149,24 @@ class OfflineExchange(BaseExchange):
         
     def __process_order(self, order_id):
         order = self.__order[order_id]
-        if order['status'] != 'closed':
+        if order['status'] == 'open':
             # 매수 주문
-            if order['side'] == 'bid' and order['price'] <= self.get_current_price('BTC'):
+            if order['side'] == 'bid' and order['price'] >= self.get_current_price('BTC'):
+                amount_krw = order['amount'] * order['price']
                 self.balance['BTC']['free'] += order['amount']
                 self.balance['BTC']['total'] += order['amount']
-                self.balance['KRW']['total'] -= order['amount'] * order['price']
+                self.balance['KRW']['total'] -= amount_krw
+                self.balance['KRW']['used'] -= amount_krw
                 order['filled'] = order['amount']
                 order['status'] = 'closed'
                 self.__open_order_id.remove(order_id)
             
             # 매도 주문    
-            elif order['side'] == 'ask' and order['price'] >= self.get_current_price('BTC'):
+            elif order['side'] == 'ask' and order['price'] <= self.get_current_price('BTC'):
                 self.balance['KRW']['free'] += order['amount'] * order['price']
                 self.balance['KRW']['total'] += order['amount'] * order['price']
                 self.balance['BTC']['total'] -= order['amount']
+                self.balance['BTC']['used'] -= order['amount']
                 order['filled'] = order['amount']
                 order['status'] = 'closed'
                 self.__open_order_id.remove(order_id)

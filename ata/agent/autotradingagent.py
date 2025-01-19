@@ -6,6 +6,7 @@ import time
 from ata.algorithm import trading
 from ata.exchange.baseexchange import BaseExchange
 from ata.utils.log import log, save_log
+from ata.utils.markerorderpriceunit import upbit_price_unit
 
 class AutoTradingAgent:
     def __init__(
@@ -21,6 +22,10 @@ class AutoTradingAgent:
         buy_cnt = {}
         sell_cnt = {}
         buy_cnt_histories = {}
+        buy_order_ids = {}
+        buy_diffs = {}
+        buy_first = {}
+        buy_last = {}
         # 거래 루프
         self.exchange.init()
         log('trading start')
@@ -43,15 +48,33 @@ class AutoTradingAgent:
                             buy_cnt[target] = 0
                         buy_cnt[target] += 1
                         sell_cnt[target] = 0
+                        if not target in buy_diffs:
+                            buy_diffs[target] = deque([0], maxlen=3)
+                        if not target in buy_first:
+                            buy_first[target] = 0
+                            buy_last[target] = 0
+                        if buy_first[target] == 0:
+                            buy_first[target] = self.exchange.get_current_price(item=target)
+                        buy_last[target] = self.exchange.get_current_price(item=target)
                         if not target in buy_cnt_histories:
                             continue
                         buy_skip_criterion = np.median(buy_cnt_histories[target]) - 1
+                        # buy_skip_criterion = 0
                         if buy_cnt[target] > buy_skip_criterion:
                             krw = min(self.exchange.get_total_balance() / 5 * (buy_cnt[target] - buy_skip_criterion), self.exchange.balance['KRW']['free'] - 100)
                             if krw > 6000:
-                                buy_order_id = self.exchange.create_buy_order_at_market_price(item=target, amount_krw=krw)
+                                curr_price = self.exchange.get_current_price(target)
+                                unit = upbit_price_unit(item=target, price=curr_price)
+                                diff = np.median(buy_diffs[target]) * 0.4 * (3 - buy_cnt[target] + buy_skip_criterion)
+                                price = curr_price - (int(curr_price * diff / unit) * unit)
+                                # price = curr_price
+                                amount_item = krw / price
+                                buy_order_id = self.exchange.create_buy_order(item=target, price=price, amount_item=amount_item)
+                                if not target in buy_order_ids:
+                                    buy_order_ids[target] = []
+                                buy_order_ids[target].append(buy_order_id)
                                 buy_order = self.exchange.get_order(buy_order_id)
-                                log(f'Buy  {target} at {buy_order["price"]:>12}(current_price{self.exchange.get_current_price(item=target):>12}, amount: {int(krw):>7}, total: {int(self.exchange.get_total_balance()):>7}) Debug - buy_cnt["{target}"] = {buy_cnt[target]}')
+                                log(f'Buy order {target} at {buy_order["price"]:>12}(current_price{self.exchange.get_current_price(item=target):>12}, amount_krw: {buy_order["price"] * buy_order["amount"]:>7}, total: {int(self.exchange.get_total_balance()):>7}) Debug - buy_cnt["{target}"] = {buy_cnt[target]}')
             
                 # 매도 주문 넣기
                 selling_candidates = monitoring_target.union(self.exchange.balance)
@@ -60,6 +83,31 @@ class AutoTradingAgent:
                     if ohlcv_per_1m is None:
                         continue
                     if self._is_sell_timing(ohlcv_per_1m) or self.exchange.is_plunge(item=target):
+                        if not target in buy_diffs:
+                            buy_diffs[target] = deque([0], maxlen=3)
+                        if not target in buy_first:
+                            buy_first[target] = 0
+                            buy_last[target] = 0
+                        buy_diffs[target].append((buy_first[target] - buy_last[target]) / buy_first[target] if buy_first[target] != 0 else 0)
+                        buy_first[target] = 0
+                        if not target in buy_order_ids:
+                            buy_order_ids[target] = []
+                        buy_prcies = []
+                        buy_amounts = []
+                        for buy_id in buy_order_ids[target]:
+                            order = self.exchange.get_order(buy_id)
+                            if order['status'] != 'closed':
+                                self.exchange.cancel_order_by_id(buy_id)
+                                log(f'Cancel {target} buy order(amount_krw: {(order["amount"] - order["filled"]) * order["price"]}, price: {order["price"]}, amount: {order["amount"]}, filled: {order["filled"]})')
+                            if order['filled'] > 0:
+                                buy_prcies.append(order['price'])
+                                buy_amounts.append(order['filled'])
+                        buy_order_ids[target].clear()
+                        if len(buy_amounts) > 0:
+                            buy_avg = np.average(buy_prcies, weights=buy_amounts)
+                            amount = np.sum(buy_amounts)
+                            log(f'Buy  {target} at {buy_avg:>12}(amount_krw: {buy_avg * amount:>7}, total: {int(self.exchange.get_total_balance()):>7})')
+                                
                         if target in buy_cnt_histories:
                             if buy_cnt[target] > 0:
                                 buy_cnt_histories[target].append(buy_cnt[target])
@@ -82,7 +130,7 @@ class AutoTradingAgent:
                                 if krw > 6000:
                                     sell_order_id = self.exchange.create_sell_order_at_market_price(item=target, amount_item=amount_item)
                                     sell_order = self.exchange.get_order(sell_order_id)
-                                    log(f'Sell {target} at {sell_order["price"]:>12}(current_price{self.exchange.get_current_price(item=target):>12}, amount: {int(krw):>7}, total: {int(self.exchange.get_total_balance()):>7})')
+                                    log(f'Sell {target} at {sell_order["price"]:>12}(amount: {int(krw):>7}, total: {int(self.exchange.get_total_balance()):>7}, current_price{self.exchange.get_current_price(item=target):>12})')
                                     buy_cnt[target] = 1
                 processing_time = time.time() - start
                 if self.wait_a_minute:
