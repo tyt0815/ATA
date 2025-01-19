@@ -65,9 +65,9 @@ class AutoTradingAgent:
                             if krw > 6000:
                                 curr_price = self.exchange.get_current_price(target)
                                 unit = upbit_price_unit(item=target, price=curr_price)
-                                diff = np.median(buy_diffs[target]) * 0.4 * (3 - buy_cnt[target] + buy_skip_criterion)
-                                price = curr_price - (int(curr_price * diff / unit) * unit)
-                                # price = curr_price
+                                # diff = np.mean(buy_diffs[target]) * 0.4 * (3 - buy_cnt[target] + buy_skip_criterion)
+                                # price = curr_price - (int(curr_price * diff / unit) * unit)
+                                price = curr_price - unit * max(2 + buy_skip_criterion - buy_cnt[target], 0)
                                 amount_item = krw / price
                                 buy_order_id = self.exchange.create_buy_order(item=target, price=price, amount_item=amount_item)
                                 if not target in buy_order_ids:
@@ -88,7 +88,8 @@ class AutoTradingAgent:
                         if not target in buy_first:
                             buy_first[target] = 0
                             buy_last[target] = 0
-                        buy_diffs[target].append((buy_first[target] - buy_last[target]) / buy_first[target] if buy_first[target] != 0 else 0)
+                        if buy_first[target] > 0:
+                            buy_diffs[target].append((buy_first[target] - buy_last[target]) / buy_first[target] if buy_first[target] != 0 else 0)
                         buy_first[target] = 0
                         if not target in buy_order_ids:
                             buy_order_ids[target] = []
