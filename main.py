@@ -1,4 +1,5 @@
 import argparse
+import os
 
 from ata.agent.autotradingagent import AutoTradingAgent
 from ata.exchange.offlineexchange import OfflineExchange
@@ -28,6 +29,7 @@ def get_args():
     return parser.parse_args()
 
 if __name__ == "__main__":
+    print(os.getpid())
     args = get_args()
     
     if args.mod == "Offline":
