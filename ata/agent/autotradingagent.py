@@ -28,6 +28,9 @@ class AutoTradingAgent:
         buy_first = {}
         buy_last = {}
         
+        buy_avg_temp = {}
+        accumulative_profits = {}
+        
         # 거래 루프
         self.exchange.init()
         log('trading start')
@@ -39,14 +42,22 @@ class AutoTradingAgent:
                 for target in sell_order_ids:
                     for sell_order_id in sell_order_ids[target]:
                         order = self.exchange.get_order(sell_order_id)
-                        if order['status'] == 'closed':
-                            log(f'Sell {target} at {order["price"]:>12}(amount: {order["price"] * order["amount"]:>7}, total: {int(self.exchange.get_total_balance()):>7}, current_price{self.exchange.get_current_price(item=target):>12})')
-                        else:
+                        order_filled = order['filled']
+                        if order['status'] != 'closed':
                             self.exchange.cancel_order_by_id(order_id=sell_order_id)
                             log(f'Cancel {target} sell order(amount_krw: {(order["amount"] - order["filled"]) * order["price"]}, price: {order["price"]}, amount: {order["amount"]}, filled: {order["filled"]})')
                             market_sell_id = self.exchange.create_sell_order_at_market_price(item=target, amount_item=order['amount'] - order['filled'])
-                            market_order = self.exchange.get_order(market_sell_id)
-                            log(f'Sell {target} at market price {market_order["price"]:>12}(amount: {market_order["price"] * market_order["amount"]:>7}, total: {int(self.exchange.get_total_balance()):>7}, current_price{self.exchange.get_current_price(item=target):>12})')
+                            order = self.exchange.get_order(market_sell_id)
+                            order_filled += order['filled']
+                        if target not in buy_avg_temp:
+                            buy_avg_temp[target] = 0
+                            profit = 0
+                        else:
+                            profit = order_filled * (order['price'] - buy_avg_temp[target])
+                        if target not in accumulative_profits:
+                            accumulative_profits[target] = 0
+                        accumulative_profits[target] += profit
+                        log(f'Sell {target} at {order["price"]}(profit: {int(profit)}, {target}profit: {int(accumulative_profits[target])}, total_profit: {int(sum(accumulative_profits.values()))}, total: {int(self.exchange.get_total_balance())}, current_price{self.exchange.get_current_price(item=target)})')
                         sell_order_ids[target].remove(sell_order_id)
                             
                 # 매수 주문 넣기
@@ -122,6 +133,7 @@ class AutoTradingAgent:
                         if len(buy_amounts) > 0:
                             buy_avg = np.average(buy_prcies, weights=buy_amounts)
                             amount = np.sum(buy_amounts)
+                            buy_avg_temp[target] = buy_avg
                             log(f'Buy  {target} at {buy_avg:>12}(amount_krw: {buy_avg * amount:>7}, total: {int(self.exchange.get_total_balance()):>7})')
                                 
                         if target in buy_cnt_histories:
