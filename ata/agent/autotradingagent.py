@@ -30,7 +30,7 @@ class AutoTradingAgent:
         
         # 거래 루프
         self.exchange.init()
-        log(f'trading start (total{self.exchange.get_total_balance()})')
+        log(f'trading start (total: {self.exchange.get_total_balance()})')
         for t in count():
             try:
                 start = time.time()
