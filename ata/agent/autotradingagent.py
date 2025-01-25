@@ -97,12 +97,16 @@ class AutoTradingAgent:
                                 # price = curr_price - (int(curr_price * diff / unit) * unit)
                                 price = curr_price - unit * max(2 + buy_skip_criterion - buy_cnt[target], 0)
                                 amount_item = krw / price
-                                buy_order_id = self.exchange.create_buy_order(item=target, price=price, amount_item=amount_item)
-                                if not target in buy_order_ids:
-                                    buy_order_ids[target] = []
-                                buy_order_ids[target].append(buy_order_id)
-                                buy_order = self.exchange.get_order(buy_order_id)
-                                log(f'Buy order {target} at {buy_order["price"]:>12}(current_price{self.exchange.get_current_price(item=target):>12}, amount_krw: {buy_order["price"] * buy_order["amount"]:>7}, total: {int(self.exchange.get_total_balance()):>7}) Debug - buy_cnt["{target}"] = {buy_cnt[target]}')
+                                try:
+                                    buy_order_id = self.exchange.create_buy_order(item=target, price=price, amount_item=amount_item)
+                                    if not target in buy_order_ids:
+                                        buy_order_ids[target] = []
+                                    buy_order_ids[target].append(buy_order_id)
+                                    buy_order = self.exchange.get_order(buy_order_id)
+                                    log(f'Buy order {target} at {buy_order["price"]:>12}(current_price{self.exchange.get_current_price(item=target):>12}, amount_krw: {buy_order["price"] * buy_order["amount"]:>7}, total: {int(self.exchange.get_total_balance()):>7}) Debug - buy_cnt["{target}"] = {buy_cnt[target]}')
+                                except Exception as e:
+                                    log(str(e))
+                                    save_log(traceback.format_exc(), log_path)
             
                 # 매도 주문 넣기
                 selling_candidates = monitoring_target.union(self.exchange.balance)

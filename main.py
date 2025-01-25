@@ -23,7 +23,7 @@ def get_args():
     parser.add_argument(
         '--end-condition',
         type=float,
-        default=0.7
+        default=0.8
     )
     
     parser.add_argument(
