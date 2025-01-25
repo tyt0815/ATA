@@ -26,6 +26,12 @@ def get_args():
         default=0.7
     )
     
+    parser.add_argument(
+        '--only-btc',
+        type=bool,
+        default=False
+    )
+    
     return parser.parse_args()
 
 if __name__ == "__main__":
@@ -38,7 +44,8 @@ if __name__ == "__main__":
     elif args.mod == 'Upbit':
         exchange = UpbitExchange(
             end_condition=args.end_condition,
-            file_path=args.file_path
+            file_path=args.file_path,
+            only_btc=args.only_btc
         )
         wait_a_minute = True
         

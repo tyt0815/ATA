@@ -8,12 +8,14 @@ class UpbitExchange(BaseExchange):
     def __init__(
         self,
         end_condition,
-        file_path
+        file_path,
+        only_btc
         ):
         super().__init__()
         self.end_condition = end_condition
         self.end_value = None
         self.file_path = file_path
+        self.only_btc = only_btc
     
     def init(self):
         log('init upbit exchange...')
@@ -59,7 +61,8 @@ class UpbitExchange(BaseExchange):
         return True
     
     def get_buying_candidates(self):
-        return ['BTC']
+        if self.only_btc:
+            return ['BTC']
         symbols = self.tickers.keys()
         krw_symbols = [x for x in symbols if x.endswith('KRW')]
         buying_candidates = []
