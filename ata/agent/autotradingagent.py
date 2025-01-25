@@ -2,6 +2,7 @@ from collections import deque
 import numpy as np
 import traceback
 import time
+from pprint import pprint
 
 from ata.algorithm import trading
 from ata.exchange.baseexchange import BaseExchange
@@ -58,6 +59,7 @@ class AutoTradingAgent:
                             accumulative_profits[target] = 0
                         accumulative_profits[target] += profit
                         log(f'Sell {target} at {order["price"]}(profit: {int(profit)}, {target}profit: {int(accumulative_profits[target])}, total_profit: {int(sum(accumulative_profits.values()))}, total: {int(self.exchange.get_total_balance())}, current_price{self.exchange.get_current_price(item=target)})')
+                        pprint(accumulative_profits)
                         sell_order_ids[target].remove(sell_order_id)
                             
                 # 매수 주문 넣기
