@@ -32,6 +32,18 @@ def get_args():
         default=False
     )
     
+    parser.add_argument(
+        '--wait-time-for-iter',
+        type=float,
+        default=60
+    )
+    
+    parser.add_argument(
+        '--wait-iter-for-sell-order',
+        type=int,
+        default=1
+    )
+    
     return parser.parse_args()
 
 if __name__ == "__main__":
@@ -40,18 +52,19 @@ if __name__ == "__main__":
     
     if args.mod == "Offline":
         exchange = OfflineExchange(args.file_path)
-        wait_a_minute = False
+        wait_time_for_iter = 0
     elif args.mod == 'Upbit':
         exchange = UpbitExchange(
             end_condition=args.end_condition,
             file_path=args.file_path,
             only_btc=args.only_btc
         )
-        wait_a_minute = True
+        wait_time_for_iter = args.wait_time_for_iter
         
     agent = AutoTradingAgent(
         exchange=exchange,
-        wait_a_minute=wait_a_minute
+        wait_time_for_iter=wait_time_for_iter,
+        wait_iter_for_sell_order=args.wait_iter_for_sell_order
     )
     
     agent.run()

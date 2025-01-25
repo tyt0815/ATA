@@ -39,7 +39,6 @@ class UpbitExchange(BaseExchange):
         if self.end_value is None:
             if self.end_condition >= 1.0:
                 self.end_value = self.end_condition
-                log(f'update end_value: {self.end_value}')
             else:
                 self.end_value = 0
         self.update()

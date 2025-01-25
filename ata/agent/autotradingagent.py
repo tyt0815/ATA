@@ -3,6 +3,7 @@ import numpy as np
 import traceback
 import time
 from pprint import pprint
+from itertools import count
 
 from ata.algorithm import trading
 from ata.exchange.baseexchange import BaseExchange
@@ -13,174 +14,158 @@ class AutoTradingAgent:
     def __init__(
         self,
         exchange:BaseExchange,
-        wait_a_minute
+        wait_time_for_iter,
+        wait_iter_for_sell_order,
+        log_path = './log'
         ):
         self.exchange = exchange
-        self.wait_a_minute = wait_a_minute
+        self.wait_time_for_iter = max(0, wait_time_for_iter)
+        self.wait_iter_for_sell_order = max(0, wait_iter_for_sell_order)
+        self.log_path = log_path
         
     def run(self):
         log('run ATA...')
-        buy_cnt = {}
-        sell_cnt = {}
-        buy_cnt_histories = {}
-        buy_order_ids = {}
-        sell_order_ids = {}
-        buy_diffs = {}
-        buy_first = {}
-        buy_last = {}
-        
-        buy_avg_temp = {}
-        accumulative_profits = {}
+        self.trading_data: dict[str, dict] = {}
+        monitoring_target = set()
         
         # 거래 루프
         self.exchange.init()
         log('trading start')
-        monitoring_target = set()
-        while True:
+        for t in count():
             try:
+                start = time.time()
+                self.log_str = ''
+                total_profit = int(sum([data['profit'] for data in self.trading_data.values()]))
+                self.__append_str(f'total: {int(self.exchange.get_total_balance()):>10}, total profit: {total_profit}')
+                self.b_log = False
                 if self.exchange.update() == False:
                     break
-                for target in sell_order_ids:
-                    for sell_order_id in sell_order_ids[target]:
-                        order = self.exchange.get_order(sell_order_id)
-                        order_filled = order['filled']
-                        if order['status'] != 'closed':
-                            self.exchange.cancel_order_by_id(order_id=sell_order_id)
-                            log(f'Cancel {target} sell order(amount_krw: {(order["amount"] - order["filled"]) * order["price"]}, price: {order["price"]}, amount: {order["amount"]}, filled: {order["filled"]})')
-                            market_sell_id = self.exchange.create_sell_order_at_market_price(item=target, amount_item=order['amount'] - order['filled'])
-                            order = self.exchange.get_order(market_sell_id)
-                            order_filled += order['filled']
-                        if target not in buy_avg_temp:
-                            buy_avg_temp[target] = 0
-                            profit = 0
-                        else:
-                            profit = order_filled * (order['price'] - buy_avg_temp[target])
-                        if target not in accumulative_profits:
-                            accumulative_profits[target] = 0
-                        accumulative_profits[target] += profit
-                        log(f'Sell {target} at {order["price"]}(profit: {int(profit)}, {target}profit: {int(accumulative_profits[target])}, total_profit: {int(sum(accumulative_profits.values()))}, total: {int(self.exchange.get_total_balance())}, current_price{self.exchange.get_current_price(item=target)})')
-                        pprint(accumulative_profits)
-                        sell_order_ids[target].remove(sell_order_id)
-                            
-                # 매수 주문 넣기
-                start = time.time()
+                
+                # 매수 주문 알고리즘
                 buying_candidates = monitoring_target.union(self.exchange.get_buying_candidates())
                 for target in buying_candidates:
                     ohlcv_per_1m = self.exchange.get_ohlcv_per_1m(target)
                     ohlcv_per_1h = self.exchange.get_ohlcv_per_1h(target)
                     if ohlcv_per_1m is None:
                         continue
+                    
+                    self.__init_trading_data(target)
+                    data = self.trading_data[target]
+                    
+                    # 매수 주문 타이밍 시 매수 주문
                     if self._is_buy_timing(ohlcv_per_1m, ohlcv_per_1h):
                         monitoring_target.add(target)
-                        if not target in buy_cnt:
-                            buy_cnt[target] = 0
-                        buy_cnt[target] += 1
-                        sell_cnt[target] = 0
-                        if not target in buy_diffs:
-                            buy_diffs[target] = deque([0], maxlen=3)
-                        if not target in buy_first:
-                            buy_first[target] = 0
-                            buy_last[target] = 0
-                        if buy_first[target] == 0:
-                            buy_first[target] = self.exchange.get_current_price(item=target)
-                        buy_last[target] = self.exchange.get_current_price(item=target)
-                        if not target in buy_cnt_histories:
-                            continue
-                        buy_skip_criterion = np.median(buy_cnt_histories[target]) - 1
-                        # buy_skip_criterion = 0
-                        if buy_cnt[target] > buy_skip_criterion:
-                            krw = min(self.exchange.get_total_balance() / 5 * (buy_cnt[target] - buy_skip_criterion), self.exchange.balance['KRW']['free'] - 100)
+                        
+                        data['buy_cnt'] += 1
+                        data['sell_cnt'] = 0
+                        buy_skip_criterion = np.median(data['buy_cnt_histories']) - 1
+                        if data['buy_cnt'] > buy_skip_criterion:
+                            krw = min(self.exchange.get_total_balance() / 5 * (data['buy_cnt'] - buy_skip_criterion), self.exchange.balance['KRW']['free'] - 100)
                             if krw > 6000:
                                 curr_price = self.exchange.get_current_price(target)
                                 unit = upbit_price_unit(item=target, price=curr_price)
-                                # diff = np.mean(buy_diffs[target]) * 0.4 * (3 - buy_cnt[target] + buy_skip_criterion)
-                                # price = curr_price - (int(curr_price * diff / unit) * unit)
-                                price = curr_price - unit * max(2 + buy_skip_criterion - buy_cnt[target], 0)
+                                price = curr_price - unit * max(2 + buy_skip_criterion - data['buy_cnt'], 0)
                                 amount_item = krw / price
                                 try:
                                     buy_order_id = self.exchange.create_buy_order(item=target, price=price, amount_item=amount_item)
-                                    if not target in buy_order_ids:
-                                        buy_order_ids[target] = []
-                                    buy_order_ids[target].append(buy_order_id)
+                                    data['buy_order_infos'].append({'id':buy_order_id, 'cnt': t})
                                     buy_order = self.exchange.get_order(buy_order_id)
-                                    log(f'Buy order {target} at {buy_order["price"]:>12}(current_price{self.exchange.get_current_price(item=target):>12}, amount_krw: {buy_order["price"] * buy_order["amount"]:>7}, total: {int(self.exchange.get_total_balance()):>7}) Debug - buy_cnt["{target}"] = {buy_cnt[target]}')
-                                except Exception as e:
-                                    log(str(e))
-                                    save_log(traceback.format_exc(), log_path)
+                                    self.__append_str(f'Buy order  {target}(current_price{curr_price:>12}, price: {buy_order["price"]:>12}, amount_krw: {buy_order["price"] * buy_order["amount"]:>7})')
+                                except:
+                                    save_log(traceback.format_exc(), self.log_path)
             
-                # 매도 주문 넣기
+                # 매도 주문 알고리즘
                 selling_candidates = monitoring_target.union(self.exchange.balance)
                 for target in selling_candidates:
                     ohlcv_per_1m = self.exchange.get_ohlcv_per_1m(target)
                     if ohlcv_per_1m is None:
                         continue
+                    self.__init_trading_data(target)
+                    data = self.trading_data[target]
                     if self._is_sell_timing(ohlcv_per_1m) or self.exchange.is_plunge(item=target):
-                        if not target in buy_diffs:
-                            buy_diffs[target] = deque([0], maxlen=3)
-                        if not target in buy_first:
-                            buy_first[target] = 0
-                            buy_last[target] = 0
-                        if buy_first[target] > 0:
-                            buy_diffs[target].append((buy_first[target] - buy_last[target]) / buy_first[target] if buy_first[target] != 0 else 0)
-                        buy_first[target] = 0
-                        if not target in buy_order_ids:
-                            buy_order_ids[target] = []
-                        buy_prcies = []
+                        curr_price = self.exchange.get_current_price(item=target)
+                        
+                        # 채결 안된 매수 주문 취소
+                        buy_prices = []
                         buy_amounts = []
-                        for buy_id in buy_order_ids[target]:
-                            order = self.exchange.get_order(buy_id)
-                            if order['status'] != 'closed':
-                                self.exchange.cancel_order_by_id(buy_id)
-                                log(f'Cancel {target} buy order(amount_krw: {(order["amount"] - order["filled"]) * order["price"]}, price: {order["price"]}, amount: {order["amount"]}, filled: {order["filled"]})')
+                        for order_info in data['buy_order_infos']:
+                            order = self.exchange.get_order(order_info['id'])
+                            if order['status'] == 'open':
+                                self.exchange.cancel_order_by_id(order_info['id'])
+                                order = self.exchange.get_order(order_info['id'])
+                                self.__append_str(f'Cancel buy order {target}(current_price{curr_price:>12}, price: {order["price"]:>12}, amount_krw: {order["price"] * (order["amount"] - order["filled"]):>7})')
                             if order['filled'] > 0:
-                                buy_prcies.append(order['price'])
+                                buy_prices.append(order['price'])
                                 buy_amounts.append(order['filled'])
-                        buy_order_ids[target].clear()
+                        data['buy_order_infos'].clear()
                         if len(buy_amounts) > 0:
-                            buy_avg = np.average(buy_prcies, weights=buy_amounts)
-                            amount = np.sum(buy_amounts)
-                            buy_avg_temp[target] = buy_avg
-                            log(f'Buy  {target} at {buy_avg:>12}(amount_krw: {buy_avg * amount:>7}, total: {int(self.exchange.get_total_balance()):>7})')
-                                
-                        if target in buy_cnt_histories:
-                            if buy_cnt[target] > 0:
-                                buy_cnt_histories[target].append(buy_cnt[target])
-                        elif target in buy_cnt:
-                            buy_cnt_histories[target] = deque([buy_cnt[target]], maxlen=3)
-                        buy_cnt[target] = 0
-                        if target in monitoring_target:
-                            monitoring_target.remove(target)
+                            buy_price_avg = np.average(buy_prices, weights=buy_amounts)
+                            buy_amount = np.sum(buy_amounts)
+                            self.__append_str(f'Buy {target}(current_price{curr_price:>12}, price: {buy_price_avg:>12}, amount_krw: {buy_price_avg * buy_amount:>7})')
+                            data['buy_price_avg'] = (data['buy_price_avg'] * data['buy_amount'] + buy_price_avg * buy_amount) / (data['buy_amount'] + buy_amount)
+                            data['buy_amount'] += buy_amount
+                        
+                        monitoring_target.discard(target)
+                            
+                        if data['buy_cnt'] > 0:
+                            data['buy_cnt_histories'].append(data['buy_cnt'])
+                        data['buy_cnt'] = 0
                         if target in self.exchange.balance:
-                            if not target in sell_cnt:
-                                sell_cnt[target] = 0
-                            sell_cnt[target] += 1 
-                            sell_skip_criterion = 0
-                            if sell_cnt[target] > sell_skip_criterion:
-                                curr_price = self.exchange.get_current_price(item=target)
-                                denominator = 2.0
-                                weight = min(denominator, sell_cnt[target] - sell_skip_criterion) / denominator
-                                amount_item = self.exchange.balance[target]['free']  * weight
-                                unit = upbit_price_unit(item=target, price=curr_price)
-                                sell_price = curr_price + unit * max(0, 2 + (sell_skip_criterion - sell_cnt[target]))
-                                krw = sell_price * amount_item
-                                if krw > 6000:
+                            data['sell_cnt'] += 1 
+                            denominator = 2.0
+                            weight = min(denominator, data['sell_cnt']) / denominator
+                            amount_item = self.exchange.balance[target]['free']  * weight
+                            unit = upbit_price_unit(item=target, price=curr_price)
+                            sell_price = curr_price + unit * max(0, 2 - data['sell_cnt'])
+                            krw = sell_price * amount_item
+                            if krw > 6000:
+                                try:
                                     sell_order_id = self.exchange.create_sell_order(item=target, price=sell_price, amount_item=amount_item)
-                                    if target not in sell_order_ids:
-                                        sell_order_ids[target] = []
-                                    sell_order_ids[target].append(sell_order_id)
+                                    data['sell_order_infos'].append({'id':sell_order_id, 'cnt': t})
                                     sell_order = self.exchange.get_order(sell_order_id)
-                                    log(f'Sell order {target} at {sell_order["price"]:>12}(amount: {sell_order["price"] * sell_order["amount"]:>7}, total: {int(self.exchange.get_total_balance()):>7}, current_price{self.exchange.get_current_price(item=target):>12})')
-                                    
+                                    self.__append_str(f'Sell order {target}(current_price{curr_price:>12}, price: {sell_order["price"]:>12}, amount_krw: {sell_order["price"] * sell_order["amount"]:>7})')
+                                except:
+                                    save_log(traceback.format_exc(), self.log_path)
+                
+                # 최종 거래 내역(매수 -> 매도까지) 로그
+                for item in self.trading_data:
+                    curr_price = self.exchange.get_current_price(item)
+                    data = self.trading_data[item]
+                    sell_order_infos_copy = data['sell_order_infos'][:]
+                    sell_prices = []
+                    sell_amounts = []
+                    for order_info in sell_order_infos_copy:
+                        order = self.exchange.get_order(order_info['id'])
+                        if order['status'] == 'open' and t - order_info['cnt'] >= self.wait_iter_for_sell_order:
+                            self.exchange.cancel_order_by_id(order_info['id'])
+                            order = self.exchange.get_order(order_info['id'])
+                            self.__append_str(f'Cancel sell order {item}(current_price{curr_price:>12}, price: {order["price"]:>12}, amount_krw: {order["price"] * (order["amount"] - order["filled"]):>7})')
+                            sell_order_id = self.exchange.create_sell_order_at_market_price(item=item, amount_item=order['amount'] - order['filled'])
+                            data['sell_order_infos'].append({'id':sell_order_id, 'cnt': order_info['cnt']})
+                            
+                        if order['status'] != 'open':
+                            if order['filled'] > 0:
+                                sell_prices.append(order['price'])
+                                sell_amounts.append(order['filled'])
+                            data['sell_order_infos'].remove(order_info)
+                    
+                    if len(sell_amounts) > 0:
+                        sell_price_avg = np.average(sell_prices, weights=sell_amounts)
+                        sell_amount = np.sum(sell_amounts)
+                        profit = (sell_price_avg - data['buy_price_avg']) * min(sell_amount, data['buy_amount'])
+                        data['profit'] += profit
+                        data['buy_amount'] = max(0, data['buy_amount'] - sell_amount)
+                        total_profit += profit
+                        self.__append_str(f'Sell {target}(current_price{curr_price:>12}, price: {buy_price_avg:>12}, amount_krw: {buy_price_avg * buy_amount:>7}, profit: {int(profit):>6}), {item} total profit: {int(data["profit"]):>10}')
+                        
+                if self.b_log:
+                    log(self.log_str)
                 processing_time = time.time() - start
-                if self.wait_a_minute:
-                    time.sleep(60 - processing_time)
-            except Exception as e:
-                log_path = './log'
-                log(str(e))
-                save_log(content=traceback.format_exc(), file_path=log_path)
+                time.sleep(max(0, self.wait_time_for_iter - processing_time))
+            except:
+                save_log(traceback.format_exc(), self.log_path)
                 self.exchange.init()
             
-                
         self._end_trading()
             
     def _end_trading(self):
@@ -207,3 +192,21 @@ class AutoTradingAgent:
     
     def _is_sell_timing(self, ohlcv_per_1m):
         return trading.check_overbought_by_bollinger_mfi(ohlcv_per_1m)
+    
+    def __init_trading_data(self, item):
+        if item in self.trading_data:
+            return
+        self.trading_data[item] = {
+            'buy_cnt' : 0,
+            'sell_cnt' : 0,
+            'buy_cnt_histories' : deque([0, 0, 0], maxlen=3),
+            'buy_order_infos' : [],
+            'sell_order_infos' : [],
+            'buy_price_avg' : 0,
+            'buy_amount' : 0,
+            'profit' : 0
+        }
+        
+    def __append_str(self, additional_content: str):
+        self.b_log = True
+        self.log_str += additional_content + '\n'

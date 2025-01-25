@@ -1,8 +1,8 @@
 from datetime import datetime
 import os
 
-def log(content):
-    print(log_prefix(), content)
+def log(content, end = '\n'):
+    print(log_prefix(), content, end=end)
         
 def save_log(content, file_path):
     now_str = log_prefix()
