@@ -30,14 +30,10 @@ class AutoTradingAgent:
         
         # 거래 루프
         self.exchange.init()
-        log(f'trading start (total: {self.exchange.get_total_balance()})')
+        log(f'trading start \ntotal: {format_float(self.exchange.get_total_balance(), 10):<10}')
         for t in count():
             try:
                 start = time.time()
-                self.log_str = ''
-                total_profit = int(sum([data['profit'] for data in self.trading_data.values()]))
-                self.__append_str(f'total: {int(self.exchange.get_total_balance()):>10}, total profit: {total_profit}')
-                self.b_log = False
                 if self.exchange.update() == False:
                     break
                 
@@ -70,7 +66,7 @@ class AutoTradingAgent:
                                     buy_order_id = self.exchange.create_buy_order(item=target, price=price, amount_item=amount_item)
                                     data['buy_order_infos'].append({'id':buy_order_id, 'cnt': t})
                                     buy_order = self.exchange.get_order(buy_order_id)
-                                    self.__append_str(f'Buy order  {target}(current_price{curr_price:>12}, price: {buy_order["price"]:>12}, amount_krw: {buy_order["price"] * buy_order["amount"]:>7})')
+                                    log(f'Buy order {target}\ntotal: {format_float(self.exchange.get_total_balance(), 10):<10}, total profit: {format_float(self.total_profit, 10):<10}, current_price{format_float(curr_price, 12):<12}, price: {format_float(buy_order["price"], 12):<12}, amount_krw: {format_float(buy_order["price"] * buy_order["amount"], 7):<7}')
                                 except:
                                     save_log(traceback.format_exc(), self.log_path)
             
@@ -93,7 +89,7 @@ class AutoTradingAgent:
                             if order['status'] == 'open':
                                 self.exchange.cancel_order_by_id(order_info['id'])
                                 order = self.exchange.get_order(order_info['id'])
-                                self.__append_str(f'Cancel buy order {target}(current_price{curr_price:>12}, price: {order["price"]:>12}, amount_krw: {order["price"] * (order["amount"] - order["filled"]):>7})')
+                                log(f'Cancel buy order {target}\ntotal: {format_float(self.exchange.get_total_balance(), 10):<10}, total profit: {format_float(self.total_profit, 10):<10}, current_price{format_float(curr_price, 12):<12}, price: {format_float(order["price"], 12):<12}, amount_krw: {format_float(order["price"] * (order["amount"] - order["filled"]), 7):<7}')
                             if order['filled'] > 0:
                                 buy_prices.append(order['price'])
                                 buy_amounts.append(order['filled'])
@@ -101,7 +97,7 @@ class AutoTradingAgent:
                         if len(buy_amounts) > 0:
                             buy_price_avg = np.average(buy_prices, weights=buy_amounts)
                             buy_amount = np.sum(buy_amounts)
-                            self.__append_str(f'Buy {target}(current_price{curr_price:>12}, price: {buy_price_avg:>12}, amount_krw: {buy_price_avg * buy_amount:>7})')
+                            log(f'Buy {target}\ntotal: {format_float(self.exchange.get_total_balance(), 10):<10}, total profit: {format_float(self.total_profit, 10):<10}, current_price{format_float(curr_price, 12):<12}, price: {format_float(buy_price_avg, 12):<12}, amount_krw: {format_float(buy_price_avg * buy_amount, 7):<7}')
                             data['buy_price_avg'] = (data['buy_price_avg'] * data['buy_amount'] + buy_price_avg * buy_amount) / (data['buy_amount'] + buy_amount)
                             data['buy_amount'] += buy_amount
                         
@@ -123,7 +119,7 @@ class AutoTradingAgent:
                                     sell_order_id = self.exchange.create_sell_order(item=target, price=sell_price, amount_item=amount_item)
                                     data['sell_order_infos'].append({'id':sell_order_id, 'cnt': t})
                                     sell_order = self.exchange.get_order(sell_order_id)
-                                    self.__append_str(f'Sell order {target}(current_price{curr_price:>12}, price: {sell_order["price"]:>12}, amount_krw: {sell_order["price"] * sell_order["amount"]:>7})')
+                                    log(f'Sell order {target}\ntotal: {format_float(self.exchange.get_total_balance(), 10):<10}, total profit: {format_float(self.total_profit, 10):<10}, current_price{format_float(curr_price, 12):<12}, price: {format_float(sell_order["price"], 12):<12}, amount_krw: {int(sell_order["price"] * sell_order["amount"]):<7}')
                                 except:
                                     save_log(traceback.format_exc(), self.log_path)
                 
@@ -139,7 +135,7 @@ class AutoTradingAgent:
                         if order['status'] == 'open' and t - order_info['cnt'] >= self.wait_iter_for_sell_order:
                             self.exchange.cancel_order_by_id(order_info['id'])
                             order = self.exchange.get_order(order_info['id'])
-                            self.__append_str(f'Cancel sell order {item}(current_price{curr_price:>12}, price: {order["price"]:>12}, amount_krw: {order["price"] * (order["amount"] - order["filled"]):>7})')
+                            log(f'Cancel sell order {item}\ntotal: {format_float(self.exchange.get_total_balance(), 10):<10}, total profit: {format_float(self.total_profit, 10):<10}, current_price{format_float(curr_price, 12):<12}, price: {format_float(order["price"], 12):<12}, amount_krw: {format_float(order["price"] * (order["amount"] - order["filled"]), 7):<7}')
                             sell_order_id = self.exchange.create_sell_order_at_market_price(item=item, amount_item=order['amount'] - order['filled'])
                             data['sell_order_infos'].append({'id':sell_order_id, 'cnt': order_info['cnt']})
                             
@@ -155,11 +151,8 @@ class AutoTradingAgent:
                         profit = (sell_price_avg - data['buy_price_avg']) * min(sell_amount, data['buy_amount'])
                         data['profit'] += profit
                         data['buy_amount'] = max(0, data['buy_amount'] - sell_amount)
-                        total_profit += profit
-                        self.__append_str(f'Sell {target}(current_price{curr_price:>12}, price: {buy_price_avg:>12}, amount_krw: {buy_price_avg * buy_amount:>7}, profit: {int(profit):>6}), {item} total profit: {int(data["profit"]):>10}')
-                        
-                if self.b_log:
-                    log(self.log_str)
+                        log(f'Sell {item}\ntotal: {format_float(self.exchange.get_total_balance(), 10):<10}, total profit: {format_float(self.total_profit, 10):<10}, current_price{format_float(curr_price, 12):<12}, price: {format_float(buy_price_avg, 12):<12}, amount_krw: {format_float(buy_price_avg * buy_amount, 7):<7}, profit: {format_float(profit, 6):<6}')
+                
                 processing_time = time.time() - start
                 time.sleep(max(0, self.wait_time_for_iter - processing_time))
             except:
@@ -177,10 +170,8 @@ class AutoTradingAgent:
                 continue
             try:
                 self.exchange.create_sell_all_order_at_market_price(item=target)
-            except Exception as e:
-                log_path = './log'
-                log(str(e))
-                save_log(content=traceback.format_exc(), file_path=log_path)
+            except:
+                save_log(content=traceback.format_exc(), file_path=self.log_path)
                 self.exchange.init()
             finally:
                 continue
@@ -207,6 +198,12 @@ class AutoTradingAgent:
             'profit' : 0
         }
         
-    def __append_str(self, additional_content: str):
-        self.b_log = True
-        self.log_str += additional_content + '\n'
+    @property
+    def total_profit(self):
+        return sum([data['profit'] for data in self.trading_data.values()])
+    
+def format_float(value, n):
+    result = str(value)[:n]
+    if result[-1] == '.':  # 소수점만 남는 경우 제거
+        result = result[:-1]
+    return result
