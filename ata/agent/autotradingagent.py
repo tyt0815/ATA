@@ -152,6 +152,7 @@ class AutoTradingAgent:
                         data['profit'] += profit
                         data['buy_amount'] = max(0, data['buy_amount'] - sell_amount)
                         log(f'Sell {item}\ntotal: {format_float(self.exchange.get_total_balance(), 10):<10}, total profit: {format_float(self.total_profit, 10):<10}, current_price{format_float(curr_price, 12):<12}, price: {format_float(buy_price_avg, 12):<12}, amount_krw: {format_float(buy_price_avg * buy_amount, 7):<7}, profit: {format_float(profit, 6):<6}')
+                        pprint({temp:format_float(self.trading_data[temp]['profit'], 10) for temp in self.trading_data})
                 
                 processing_time = time.time() - start
                 time.sleep(max(0, self.wait_time_for_iter - processing_time))
@@ -206,4 +207,4 @@ def format_float(value, n):
     result = str(value)[:n]
     if result[-1] == '.':  # 소수점만 남는 경우 제거
         result = result[:-1]
-    return result
+    return float(result)
