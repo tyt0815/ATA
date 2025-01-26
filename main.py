@@ -58,14 +58,12 @@ if __name__ == "__main__":
     
     if args.mod == "Offline":
         exchange = OfflineExchange(args.file_path)
-        wait_time_for_iter = 0
     elif args.mod == 'Upbit':
         exchange = UpbitExchange(
             end_condition=args.end_condition,
             file_path=args.file_path,
             only_btc=args.only_btc
         )
-        wait_time_for_iter = args.wait_time_for_iter
         
     agent = AutoTradingAgent(
         exchange=exchange,
