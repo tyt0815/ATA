@@ -170,3 +170,6 @@ class OfflineExchange(BaseExchange):
                 order['filled'] = order['amount']
                 order['status'] = 'closed'
                 self.__open_order_id.remove(order_id)
+                
+    def get_time(self):
+        return (self.idx + 1) * 60

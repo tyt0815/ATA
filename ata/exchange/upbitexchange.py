@@ -1,4 +1,5 @@
 import ccxt
+import time
 import pandas as pd
 
 from ata.exchange.baseexchange import BaseExchange
@@ -59,25 +60,20 @@ class UpbitExchange(BaseExchange):
         return True
     
     def get_buying_candidates(self):
+        buying_candidates = set()
+        buying_candidates.add('BTC')
         if self.only_btc:
-            return ['BTC']
+            return buying_candidates
         symbols = self.tickers.keys()
         krw_symbols = [x for x in symbols if x.endswith('KRW')]
-        buying_candidates = []
         low_percentage = -0.05
-        high_percentage = max(0.1, self.tickers['BTC/KRW']['percentage'])
+        high_percentage = max(0.03, self.tickers['BTC/KRW']['percentage'])
         for symbol in krw_symbols:
             ticker = self.tickers[symbol]
             percentage = ticker['percentage']
             if float(ticker['info']['acc_trade_price_24h']) > 100000000000 and percentage >= low_percentage and percentage < high_percentage:
-                buying_candidates.append(symbol.split('/')[0])
+                buying_candidates.add(symbol.split('/')[0])
         return buying_candidates
-    
-    def is_plunge(self, item):
-        ticker = self.tickers[item+'/KRW']
-        if ticker['percentage'] < -0.1:
-            return True
-        return False
     
     def create_buy_order(self, item, price, amount_item):
         resp = self.exchange.create_limit_buy_order(
@@ -185,4 +181,5 @@ class UpbitExchange(BaseExchange):
         df = df[['open', 'high', 'low', 'close', 'volume']]
         return df
     
-    
+    def get_time(self):
+        return time.time()

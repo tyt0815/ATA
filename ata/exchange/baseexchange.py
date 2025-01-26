@@ -31,10 +31,6 @@ class BaseExchange:
         pass
     
     @abstractmethod
-    def is_plunge(self, item):
-        pass
-    
-    @abstractmethod
     def create_buy_order(self, item, price, amount_item):
         pass
     
@@ -78,3 +74,6 @@ class BaseExchange:
     def cancel_order_all(self):
         pass
     
+    @abstractmethod
+    def get_time(self):
+        pass

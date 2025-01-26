@@ -1,7 +1,6 @@
 from collections import deque
 import numpy as np
 import traceback
-import time
 from pprint import pprint
 from itertools import count
 
@@ -14,13 +13,15 @@ class AutoTradingAgent:
     def __init__(
         self,
         exchange:BaseExchange,
-        wait_time_for_iter,
-        wait_iter_for_sell_order,
+        wait_time_for_buy_order,
+        wait_time_for_sell_order,
+        wait_time_for_cancel_sell_order,
         log_path = './log'
         ):
         self.exchange = exchange
-        self.wait_time_for_iter = max(0, wait_time_for_iter)
-        self.wait_iter_for_sell_order = max(0, wait_iter_for_sell_order)
+        self.wait_time_for_buy_order = max(0, wait_time_for_buy_order)
+        self.wait_time_for_sell_order = max(0, wait_time_for_sell_order)
+        self.wait_time_for_cancel_sell_order = wait_time_for_cancel_sell_order
         self.log_path = log_path
         
     def run(self):
@@ -33,7 +34,6 @@ class AutoTradingAgent:
         log(f'trading start \ntotal: {format_float(self.exchange.get_total_balance(), 10):<10}')
         for t in count():
             try:
-                start = time.time()
                 if self.exchange.update() == False:
                     break
                 
@@ -49,22 +49,22 @@ class AutoTradingAgent:
                     data = self.trading_data[target]
                     
                     # 매수 주문 타이밍 시 매수 주문
-                    if self._is_buy_timing(ohlcv_per_1m, ohlcv_per_1h):
+                    if self._is_buy_timing(ohlcv_per_1m, ohlcv_per_1h) and self.exchange.get_time() - data['last_buy_time'] >= self.wait_time_for_buy_order:
                         monitoring_target.add(target)
-                        
+                        curr_price = self.exchange.get_current_price(target)
+                        data['last_buy_time'] = self.exchange.get_time()
                         data['buy_cnt'] += 1
                         data['sell_cnt'] = 0
                         buy_skip_criterion = np.median(data['buy_cnt_histories']) - 1
                         if data['buy_cnt'] > buy_skip_criterion:
                             krw = min(self.exchange.get_total_balance() / 5 * (data['buy_cnt'] - buy_skip_criterion), self.exchange.balance['KRW']['free'] - 100)
                             if krw > 6000:
-                                curr_price = self.exchange.get_current_price(target)
                                 unit = upbit_price_unit(item=target, price=curr_price)
                                 price = curr_price - unit * max(2 + buy_skip_criterion - data['buy_cnt'], 0)
                                 amount_item = krw / price
                                 try:
                                     buy_order_id = self.exchange.create_buy_order(item=target, price=price, amount_item=amount_item)
-                                    data['buy_order_infos'].append({'id':buy_order_id, 'cnt': t})
+                                    data['buy_order_infos'].append({'id':buy_order_id, 'time': self.exchange.get_time()})
                                     buy_order = self.exchange.get_order(buy_order_id)
                                     log(f'Buy order {target}\ntotal: {format_float(self.exchange.get_total_balance(), 10):<10}, total profit: {format_float(self.total_profit, 10):<10}, current_price: {format_float(curr_price, 12):<12}, price: {format_float(buy_order["price"], 12):<12}, amount_krw: {format_float(buy_order["price"] * buy_order["amount"], 7):<7}')
                                 except:
@@ -78,9 +78,10 @@ class AutoTradingAgent:
                         continue
                     self.__init_trading_data(target)
                     data = self.trading_data[target]
-                    if self._is_sell_timing(ohlcv_per_1m) or self.exchange.is_plunge(item=target):
+                    if self._is_sell_timing(ohlcv_per_1m) and self.exchange.get_time() - data['last_sell_time'] >= self.wait_time_for_sell_order:
+                        monitoring_target.discard(target)
                         curr_price = self.exchange.get_current_price(item=target)
-                        
+                        data['last_sell_time'] = self.exchange.get_time()
                         # 채결 안된 매수 주문 취소
                         buy_prices = []
                         buy_amounts = []
@@ -100,8 +101,6 @@ class AutoTradingAgent:
                             log(f'Buy {target}\ntotal: {format_float(self.exchange.get_total_balance(), 10):<10}, total profit: {format_float(self.total_profit, 10):<10}, current_price: {format_float(curr_price, 12):<12}, price: {format_float(buy_price_avg, 12):<12}, amount_krw: {format_float(buy_price_avg * buy_amount, 7):<7}')
                             data['buy_price_avg'] = (data['buy_price_avg'] * data['buy_amount'] + buy_price_avg * buy_amount) / (data['buy_amount'] + buy_amount)
                             data['buy_amount'] += buy_amount
-                        
-                        monitoring_target.discard(target)
                             
                         if data['buy_cnt'] > 0:
                             data['buy_cnt_histories'].append(data['buy_cnt'])
@@ -117,7 +116,7 @@ class AutoTradingAgent:
                             if krw > 6000:
                                 try:
                                     sell_order_id = self.exchange.create_sell_order(item=target, price=sell_price, amount_item=amount_item)
-                                    data['sell_order_infos'].append({'id':sell_order_id, 'cnt': t})
+                                    data['sell_order_infos'].append({'id':sell_order_id, 'time': self.exchange.get_time()})
                                     sell_order = self.exchange.get_order(sell_order_id)
                                     log(f'Sell order {target}\ntotal: {format_float(self.exchange.get_total_balance(), 10):<10}, total profit: {format_float(self.total_profit, 10):<10}, current_price: {format_float(curr_price, 12):<12}, price: {format_float(sell_order["price"], 12):<12}, amount_krw: {int(sell_order["price"] * sell_order["amount"]):<7}')
                                 except:
@@ -132,12 +131,12 @@ class AutoTradingAgent:
                     sell_amounts = []
                     for order_info in sell_order_infos_copy:
                         order = self.exchange.get_order(order_info['id'])
-                        if order['status'] == 'open' and t - order_info['cnt'] >= self.wait_iter_for_sell_order:
+                        if order['status'] == 'open' and self.exchange.get_time() - order_info['time'] >= self.wait_time_for_cancel_sell_order:
                             self.exchange.cancel_order_by_id(order_info['id'])
                             order = self.exchange.get_order(order_info['id'])
                             log(f'Cancel sell order {item}\ntotal: {format_float(self.exchange.get_total_balance(), 10):<10}, total profit: {format_float(self.total_profit, 10):<10}, current_price: {format_float(curr_price, 12):<12}, price: {format_float(order["price"], 12):<12}, amount_krw: {format_float(order["price"] * (order["amount"] - order["filled"]), 7):<7}')
                             sell_order_id = self.exchange.create_sell_order_at_market_price(item=item, amount_item=order['amount'] - order['filled'])
-                            data['sell_order_infos'].append({'id':sell_order_id, 'cnt': order_info['cnt']})
+                            data['sell_order_infos'].append({'id':sell_order_id, 'time': order_info['time']})
                             
                         if order['status'] != 'open':
                             if order['filled'] > 0:
@@ -154,8 +153,6 @@ class AutoTradingAgent:
                         log(f'Sell {item}\ntotal: {format_float(self.exchange.get_total_balance(), 10):<10}, total profit: {format_float(self.total_profit, 10):<10}, current_price: {format_float(curr_price, 12):<12}, price: {format_float(sell_price_avg, 12):<12}, amount_krw: {format_float(sell_price_avg * buy_amount, 7):<7}, profit: {format_float(profit, 6):<6}')
                         pprint({temp:format_float(self.trading_data[temp]['profit'], 10) for temp in self.trading_data})
                 
-                processing_time = time.time() - start
-                time.sleep(max(0, self.wait_time_for_iter - processing_time))
             except:
                 save_log(traceback.format_exc(), self.log_path)
                 self.exchange.init()
@@ -196,7 +193,9 @@ class AutoTradingAgent:
             'sell_order_infos' : [],
             'buy_price_avg' : 0,
             'buy_amount' : 0,
-            'profit' : 0
+            'profit' : 0,
+            'last_buy_time': 0,
+            'last_sell_time' : 0
         }
         
     @property

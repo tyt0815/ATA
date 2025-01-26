@@ -33,15 +33,21 @@ def get_args():
     )
     
     parser.add_argument(
-        '--wait-time-for-iter',
+        '--wait-time-for-buy-order',
         type=float,
         default=60
     )
     
     parser.add_argument(
-        '--wait-iter-for-sell-order',
-        type=int,
-        default=1
+        '--wait-time-for-sell-order',
+        type=float,
+        default=60
+    )
+    
+    parser.add_argument(
+        '--wait-time-for-cancel-sell-order',
+        type=float,
+        default=60
     )
     
     return parser.parse_args()
@@ -63,8 +69,9 @@ if __name__ == "__main__":
         
     agent = AutoTradingAgent(
         exchange=exchange,
-        wait_time_for_iter=wait_time_for_iter,
-        wait_iter_for_sell_order=args.wait_iter_for_sell_order
+        wait_time_for_buy_order=args.wait_time_for_buy_order,
+        wait_time_for_sell_order=args.wait_time_for_sell_order,
+        wait_time_for_cancel_sell_order=args.wait_time_for_cancel_sell_order
     )
     
     agent.run()
