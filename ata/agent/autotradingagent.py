@@ -191,7 +191,7 @@ class AutoTradingAgent:
         self.trading_data[item] = {
             'buy_cnt' : 0,
             'sell_cnt' : 0,
-            'buy_cnt_histories' : deque([0, 0, 0], maxlen=3),
+            'buy_cnt_histories' : deque([0], maxlen=5),
             'buy_order_infos' : [],
             'sell_order_infos' : [],
             'buy_price_avg' : 0,
