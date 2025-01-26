@@ -66,7 +66,7 @@ class AutoTradingAgent:
                                     buy_order_id = self.exchange.create_buy_order(item=target, price=price, amount_item=amount_item)
                                     data['buy_order_infos'].append({'id':buy_order_id, 'cnt': t})
                                     buy_order = self.exchange.get_order(buy_order_id)
-                                    log(f'Buy order {target}\ntotal: {format_float(self.exchange.get_total_balance(), 10):<10}, total profit: {format_float(self.total_profit, 10):<10}, current_price{format_float(curr_price, 12):<12}, price: {format_float(buy_order["price"], 12):<12}, amount_krw: {format_float(buy_order["price"] * buy_order["amount"], 7):<7}')
+                                    log(f'Buy order {target}\ntotal: {format_float(self.exchange.get_total_balance(), 10):<10}, total profit: {format_float(self.total_profit, 10):<10}, current_price: {format_float(curr_price, 12):<12}, price: {format_float(buy_order["price"], 12):<12}, amount_krw: {format_float(buy_order["price"] * buy_order["amount"], 7):<7}')
                                 except:
                                     save_log(traceback.format_exc(), self.log_path)
             
@@ -89,7 +89,7 @@ class AutoTradingAgent:
                             if order['status'] == 'open':
                                 self.exchange.cancel_order_by_id(order_info['id'])
                                 order = self.exchange.get_order(order_info['id'])
-                                log(f'Cancel buy order {target}\ntotal: {format_float(self.exchange.get_total_balance(), 10):<10}, total profit: {format_float(self.total_profit, 10):<10}, current_price{format_float(curr_price, 12):<12}, price: {format_float(order["price"], 12):<12}, amount_krw: {format_float(order["price"] * (order["amount"] - order["filled"]), 7):<7}')
+                                log(f'Cancel buy order {target}\ntotal: {format_float(self.exchange.get_total_balance(), 10):<10}, total profit: {format_float(self.total_profit, 10):<10}, current_price: {format_float(curr_price, 12):<12}, price: {format_float(order["price"], 12):<12}, amount_krw: {format_float(order["price"] * (order["amount"] - order["filled"]), 7):<7}')
                             if order['filled'] > 0:
                                 buy_prices.append(order['price'])
                                 buy_amounts.append(order['filled'])
@@ -97,7 +97,7 @@ class AutoTradingAgent:
                         if len(buy_amounts) > 0:
                             buy_price_avg = np.average(buy_prices, weights=buy_amounts)
                             buy_amount = np.sum(buy_amounts)
-                            log(f'Buy {target}\ntotal: {format_float(self.exchange.get_total_balance(), 10):<10}, total profit: {format_float(self.total_profit, 10):<10}, current_price{format_float(curr_price, 12):<12}, price: {format_float(buy_price_avg, 12):<12}, amount_krw: {format_float(buy_price_avg * buy_amount, 7):<7}')
+                            log(f'Buy {target}\ntotal: {format_float(self.exchange.get_total_balance(), 10):<10}, total profit: {format_float(self.total_profit, 10):<10}, current_price: {format_float(curr_price, 12):<12}, price: {format_float(buy_price_avg, 12):<12}, amount_krw: {format_float(buy_price_avg * buy_amount, 7):<7}')
                             data['buy_price_avg'] = (data['buy_price_avg'] * data['buy_amount'] + buy_price_avg * buy_amount) / (data['buy_amount'] + buy_amount)
                             data['buy_amount'] += buy_amount
                         
@@ -119,7 +119,7 @@ class AutoTradingAgent:
                                     sell_order_id = self.exchange.create_sell_order(item=target, price=sell_price, amount_item=amount_item)
                                     data['sell_order_infos'].append({'id':sell_order_id, 'cnt': t})
                                     sell_order = self.exchange.get_order(sell_order_id)
-                                    log(f'Sell order {target}\ntotal: {format_float(self.exchange.get_total_balance(), 10):<10}, total profit: {format_float(self.total_profit, 10):<10}, current_price{format_float(curr_price, 12):<12}, price: {format_float(sell_order["price"], 12):<12}, amount_krw: {int(sell_order["price"] * sell_order["amount"]):<7}')
+                                    log(f'Sell order {target}\ntotal: {format_float(self.exchange.get_total_balance(), 10):<10}, total profit: {format_float(self.total_profit, 10):<10}, current_price: {format_float(curr_price, 12):<12}, price: {format_float(sell_order["price"], 12):<12}, amount_krw: {int(sell_order["price"] * sell_order["amount"]):<7}')
                                 except:
                                     save_log(traceback.format_exc(), self.log_path)
                 
@@ -135,7 +135,7 @@ class AutoTradingAgent:
                         if order['status'] == 'open' and t - order_info['cnt'] >= self.wait_iter_for_sell_order:
                             self.exchange.cancel_order_by_id(order_info['id'])
                             order = self.exchange.get_order(order_info['id'])
-                            log(f'Cancel sell order {item}\ntotal: {format_float(self.exchange.get_total_balance(), 10):<10}, total profit: {format_float(self.total_profit, 10):<10}, current_price{format_float(curr_price, 12):<12}, price: {format_float(order["price"], 12):<12}, amount_krw: {format_float(order["price"] * (order["amount"] - order["filled"]), 7):<7}')
+                            log(f'Cancel sell order {item}\ntotal: {format_float(self.exchange.get_total_balance(), 10):<10}, total profit: {format_float(self.total_profit, 10):<10}, current_price: {format_float(curr_price, 12):<12}, price: {format_float(order["price"], 12):<12}, amount_krw: {format_float(order["price"] * (order["amount"] - order["filled"]), 7):<7}')
                             sell_order_id = self.exchange.create_sell_order_at_market_price(item=item, amount_item=order['amount'] - order['filled'])
                             data['sell_order_infos'].append({'id':sell_order_id, 'cnt': order_info['cnt']})
                             
@@ -151,7 +151,7 @@ class AutoTradingAgent:
                         profit = (sell_price_avg - data['buy_price_avg']) * min(sell_amount, data['buy_amount'])
                         data['profit'] += profit
                         data['buy_amount'] = max(0, data['buy_amount'] - sell_amount)
-                        log(f'Sell {item}\ntotal: {format_float(self.exchange.get_total_balance(), 10):<10}, total profit: {format_float(self.total_profit, 10):<10}, current_price{format_float(curr_price, 12):<12}, price: {format_float(buy_price_avg, 12):<12}, amount_krw: {format_float(buy_price_avg * buy_amount, 7):<7}, profit: {format_float(profit, 6):<6}')
+                        log(f'Sell {item}\ntotal: {format_float(self.exchange.get_total_balance(), 10):<10}, total profit: {format_float(self.total_profit, 10):<10}, current_price: {format_float(curr_price, 12):<12}, price: {format_float(buy_price_avg, 12):<12}, amount_krw: {format_float(buy_price_avg * buy_amount, 7):<7}, profit: {format_float(profit, 6):<6}')
                         pprint({temp:format_float(self.trading_data[temp]['profit'], 10) for temp in self.trading_data})
                 
                 processing_time = time.time() - start
