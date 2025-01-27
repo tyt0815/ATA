@@ -1,8 +1,9 @@
 import argparse
 import os
 
-from ata.agent.autotradingagent import AutoTradingAgent
+from ata.agent.lhagent import LHAgent
 from ata.exchange.offlineexchange import OfflineExchange
+from ata.exchange.offlinedataexchange import OfflineDataExchange
 from ata.exchange.upbitexchange import UpbitExchange
 
 def get_args():
@@ -58,18 +59,20 @@ if __name__ == "__main__":
     
     if args.mod == "Offline":
         exchange = OfflineExchange(args.file_path)
+        # exchange = OfflineDataExchange(args.file_path)
     elif args.mod == 'Upbit':
         exchange = UpbitExchange(
             end_condition=args.end_condition,
             file_path=args.file_path,
             only_btc=args.only_btc
         )
-        
-    agent = AutoTradingAgent(
+    
+    agent = LHAgent(
         exchange=exchange,
         wait_time_for_buy_order=args.wait_time_for_buy_order,
         wait_time_for_sell_order=args.wait_time_for_sell_order,
-        wait_time_for_cancel_sell_order=args.wait_time_for_cancel_sell_order
+        wait_time_for_cancel_sell_order=args.wait_time_for_cancel_sell_order,
+        only_btc=True
     )
     
     agent.run()

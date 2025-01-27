@@ -18,6 +18,11 @@ class BaseExchange:
             return 0
         return ohlcv['close'].iloc[-1]
     
+    def is_tradable(self, item):
+        if self.get_ohlcv_per_1m(item) is None:
+            return False
+        return True
+    
     @abstractmethod
     def init(self):
         pass
@@ -71,9 +76,9 @@ class BaseExchange:
         pass
     
     @abstractmethod
-    def cancel_order_all(self):
+    def get_time(self):
         pass
     
     @abstractmethod
-    def get_time(self):
+    def get_tickers(self):
         pass

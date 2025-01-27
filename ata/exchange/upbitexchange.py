@@ -166,11 +166,6 @@ class UpbitExchange(BaseExchange):
             )
         except:
             return self.get_order(order_id=order_id)
-        
-    
-    def cancel_order_all(self):
-        for item in self.balance:
-            self.cancel_order_by_item(item=item)
             
     def __preprocess_ohlcv(self, ohlcv):
         df = pd.DataFrame(ohlcv, columns=['datetime', 'open', 'high', 'low', 'close', 'volume'])
@@ -183,3 +178,6 @@ class UpbitExchange(BaseExchange):
     
     def get_time(self):
         return time.time()
+    
+    def get_tickers(self):
+        return self.tickers
