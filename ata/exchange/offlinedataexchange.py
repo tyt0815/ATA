@@ -23,8 +23,7 @@ class OfflineDataExchange(VirtualExchange):
         
         self.__ohlcv_len = 20
         
-        # offset = 60 * self.__ohlcv_len # 60분 * self.__ohlcv_len
-        offset = 300
+        offset = 60 * self.__ohlcv_len # 60분 * self.__ohlcv_len
         assert offset <= len(self.data), f"error: not enough offline data ({offset} {len(self.data)})"
         self.idx = offset - 2
         

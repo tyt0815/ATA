@@ -31,7 +31,6 @@ class OfflineExchange(BaseExchange):
         self.__ohlcv_len = 20
         
         offset = 60 * self.__ohlcv_len
-        offset = 300
         assert offset <= len(self.data), f"error: not enough offline data ({offset} {len(self.data)})"
         self.idx = offset - 2
         self.update()
