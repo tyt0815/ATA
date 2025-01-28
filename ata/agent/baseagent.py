@@ -7,8 +7,6 @@ from pprint import pprint
 from ata.exchange.baseexchange import BaseExchange
 from ata.utils.format import format_float
 from ata.utils.log import log, save_log
-from ata.utils.markerorderpriceunit import upbit_price_unit
-from ata.utils import trade
 
 class BaseAgent():
     def __init__(
@@ -18,6 +16,7 @@ class BaseAgent():
         wait_time_for_sell_order,
         wait_time_for_cancel_sell_order,
         only_btc,
+        end_condition,
         log_path = './log'
         ):
         self.exchange = exchange
@@ -27,19 +26,23 @@ class BaseAgent():
         self.wait_time_for_cancel_sell_order = wait_time_for_cancel_sell_order
         self.only_btc = only_btc
         self.log_path = log_path
+        self.end_condition = end_condition
         
     def run(self):
         log('run ATA...')
         monitoring_target = set()
-        
         # 거래 루프
         self.exchange.init()
+        top_value = self.exchange.get_total_balance()
         log(f'trading start \ntotal: {format_float(self.exchange.get_total_balance(), 10):<10}')
         while True:
             try:
                 if self.exchange.update() == False:
                     break
-                
+                top_value = max(top_value, self.exchange.get_total_balance())
+                if self.exchange.get_total_balance() < top_value * self.end_condition:
+                    log(f'Top value: {top_value}, Current balance: {self.exchange.get_total_balance()}')
+                    break
                 # 매수 주문 알고리즘
                 buying_candidates = monitoring_target.union(self._get_buying_candidates())
                 for target in buying_candidates:
@@ -151,7 +154,7 @@ class BaseAgent():
                         data['profit'] += profit
                         data['buy_amount'] = max(0, data['buy_amount'] - sell_amount)
                         log(f'Sell {item}\ntotal: {format_float(self.exchange.get_total_balance(), 10):<10}, total profit: {format_float(self.total_profit, 10):<10}, current_price: {format_float(curr_price, 12):<12}, price: {format_float(sell_price_avg, 12):<12}, amount_krw: {format_float(sell_price_avg * sell_amount, 7):<7}, profit: {format_float(profit, 6):<6}')
-                        pprint({temp:format_float(self.trading_data[temp]['profit'], 10) for temp in self.trading_data})
+                        self.print_profits()
                 
             except KeyboardInterrupt as e:
                 break
@@ -175,6 +178,7 @@ class BaseAgent():
                 self.exchange.init()
             finally:
                 continue
+        self.print_profits()
         log('end trading')
         return
     
@@ -193,6 +197,9 @@ class BaseAgent():
             'last_buy_time': 0,
             'last_sell_time' : 0
         }
+        
+    def print_profits(self):
+        pprint({temp:format_float(self.trading_data[temp]['profit'], 10) for temp in self.trading_data})
         
     @property
     def total_profit(self):

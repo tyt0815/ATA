@@ -2,9 +2,9 @@ import argparse
 import os
 
 from ata.agent.lhagent import LHAgent
-from ata.exchange.offlineexchange import OfflineExchange
-from ata.exchange.offlinedataexchange import OfflineDataExchange
+from ata.exchange.offlineexchangesimulator import OfflineExchangeSimulator
 from ata.exchange.upbitexchange import UpbitExchange
+from ata.exchange.upbitexchangesimulator import UpbitExchangeSimulator
 
 def get_args():
     parser = argparse.ArgumentParser()
@@ -12,7 +12,7 @@ def get_args():
         "--mod",
         type=str,
         default="Upbit",
-        choices=["Offline", "Upbit"]
+        choices=["Upbit", "OfflineSimul", "UpbitSimul"]
     )
     
     parser.add_argument(
@@ -57,14 +57,19 @@ if __name__ == "__main__":
     print(os.getpid())
     args = get_args()
     
+    for arg, value in vars(args).items():
+        print(f"{arg}: {value}")
+    print()
     if args.mod == "Offline":
-        exchange = OfflineExchange(args.file_path)
-        # exchange = OfflineDataExchange(args.file_path)
+        exchange = OfflineExchangeSimulator(args.file_path)
     elif args.mod == 'Upbit':
         exchange = UpbitExchange(
             end_condition=args.end_condition,
-            file_path=args.file_path,
-            only_btc=args.only_btc
+            file_path=args.file_path
+        )
+    elif args.mod == 'UpbitSimul':
+        exchange=UpbitExchangeSimulator(
+            file_path=args.file_path
         )
     
     agent = LHAgent(
@@ -72,7 +77,8 @@ if __name__ == "__main__":
         wait_time_for_buy_order=args.wait_time_for_buy_order,
         wait_time_for_sell_order=args.wait_time_for_sell_order,
         wait_time_for_cancel_sell_order=args.wait_time_for_cancel_sell_order,
-        only_btc=True
+        only_btc=True,
+        end_condition=args.end_condition
     )
     
     agent.run()

@@ -32,10 +32,6 @@ class BaseExchange:
         pass
     
     @abstractmethod
-    def get_buying_candidates(self):
-        pass
-    
-    @abstractmethod
     def create_buy_order(self, item, price, amount_item):
         pass
     

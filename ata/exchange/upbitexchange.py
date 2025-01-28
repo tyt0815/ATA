@@ -9,14 +9,12 @@ class UpbitExchange(BaseExchange):
     def __init__(
         self,
         end_condition,
-        file_path,
-        only_btc
+        file_path
         ):
         super().__init__()
         self.end_condition = end_condition
         self.end_value = None
         self.file_path = file_path
-        self.only_btc = only_btc
     
     def init(self):
         log('init upbit exchange...')
@@ -59,21 +57,21 @@ class UpbitExchange(BaseExchange):
         
         return True
     
-    def get_buying_candidates(self):
-        buying_candidates = set()
-        buying_candidates.add('BTC')
-        if self.only_btc:
-            return buying_candidates
-        symbols = self.tickers.keys()
-        krw_symbols = [x for x in symbols if x.endswith('KRW')]
-        low_percentage = -0.05
-        high_percentage = max(0.03, self.tickers['BTC/KRW']['percentage'])
-        for symbol in krw_symbols:
-            ticker = self.tickers[symbol]
-            percentage = ticker['percentage']
-            if float(ticker['info']['acc_trade_price_24h']) > 100000000000 and percentage >= low_percentage and percentage < high_percentage:
-                buying_candidates.add(symbol.split('/')[0])
-        return buying_candidates
+    # def get_buying_candidates(self):
+    #     buying_candidates = set()
+    #     buying_candidates.add('BTC')
+    #     if self.only_btc:
+    #         return buying_candidates
+    #     symbols = self.tickers.keys()
+    #     krw_symbols = [x for x in symbols if x.endswith('KRW')]
+    #     low_percentage = -0.05
+    #     high_percentage = max(0.03, self.tickers['BTC/KRW']['percentage'])
+    #     for symbol in krw_symbols:
+    #         ticker = self.tickers[symbol]
+    #         percentage = ticker['percentage']
+    #         if float(ticker['info']['acc_trade_price_24h']) > 100000000000 and percentage >= low_percentage and percentage < high_percentage:
+    #             buying_candidates.add(symbol.split('/')[0])
+    #     return buying_candidates
     
     def create_buy_order(self, item, price, amount_item):
         resp = self.exchange.create_limit_buy_order(

@@ -21,5 +21,7 @@ kill -9 ~
 
 # 시뮬레이션 실행
 ```
-python main.py --file-path BTC_Data.csv --mod Offline
+python main.py --mod OfflineSimul --file-path BTC_Data.csv
+
+python main.py --mod UpbitSimul
 ```

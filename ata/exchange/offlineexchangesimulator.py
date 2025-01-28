@@ -1,8 +1,8 @@
 import pandas as pd
 
-from ata.exchange.virtualexchange import VirtualExchange
+from ata.exchange.baseexchangesimulator import BaseExchangeSimulator
 
-class OfflineDataExchange(VirtualExchange):
+class OfflineExchangeSimulator(BaseExchangeSimulator):
     def __init__(
         self,
         file_path,
@@ -42,9 +42,6 @@ class OfflineDataExchange(VirtualExchange):
         
         
         return super().update()
-    
-    def get_buying_candidates(self):
-        return ['BTC']
 
     def get_ohlcv_per_1m(self, item):
         if item == 'KRW':

@@ -2,7 +2,7 @@ from abc import abstractmethod
 
 from ata.exchange.baseexchange import BaseExchange
 
-class VirtualExchange(BaseExchange):
+class BaseExchangeSimulator(BaseExchange):
     def __init__(
         self,
         balance = 100000
@@ -10,8 +10,7 @@ class VirtualExchange(BaseExchange):
         super().__init__()
         
         self.balance = {
-                'KRW': {'free': balance, 'used': 0, 'total': balance},
-                'BTC': {'free': 0, 'used': 0, 'total': 0}
+                'KRW': {'free': balance, 'used': 0, 'total': balance}
             }
         
         self.__order = {}
@@ -49,8 +48,8 @@ class VirtualExchange(BaseExchange):
     def create_sell_order(self, item, price, amount_item):
         if amount_item > self.balance[item]['free']:
             raise Exception(f'{item} 부족(request: {amount_item}, remained: {self.balance[item]["free"]})')
-        self.balance['BTC']['free'] -= amount_item
-        self.balance['BTC']['used'] += amount_item
+        self.balance[item]['free'] -= amount_item
+        self.balance[item]['used'] += amount_item
         order_id = self.__make_order(item, status='open', side='ask', price=price, amount=amount_item, filled=0)
         return order_id
     
@@ -60,7 +59,13 @@ class VirtualExchange(BaseExchange):
         return order_id
     
     def get_total_balance(self):
-        return self.balance['KRW']['total'] + self.balance['BTC']['total'] * self.get_current_price('BTC')
+        total = 0
+        for item in self.balance:
+            if item == 'KRW':
+                total += self.balance[item]['total']
+            else:
+                total += (self.balance[item]['total'] * self.get_current_price(item=item))
+        return total
     
     def get_order(self, order_id):
         return self.__order[order_id]
@@ -77,26 +82,31 @@ class VirtualExchange(BaseExchange):
                     self.balance['KRW']['free'] += amount_krw
                     self.balance['KRW']['used'] -= amount_krw
                 else:
-                    self.balance['BTC']['free'] += order['amount']
-                    self.balance['BTC']['used'] -= order['amount']
+                    item = order['symbol'].split('/')[0]
+                    self.balance[item]['free'] += order['amount']
+                    self.balance[item]['used'] -= order['amount']
     
     
     def __make_order(self, item, status, side, price, amount, filled):
         order_id = f'{self.__id_cnt}'
         self.__id_cnt += 1
-        self.__order[order_id] = {'status': status, 'side': side, 'price': price, 'amount': amount, 'filled': filled, 'id': order_id}
+        self.__order[order_id] = {'status': status, 'side': side, 'price': price, 'amount': amount, 'filled': filled,
+                                  'id': order_id, 'symbol': item+'/KRW'}
         if status == 'open':
             self.__open_order_id.append(order_id)
         return order_id
         
     def __process_order(self, order_id):
         order = self.__order[order_id]
+        item = order['symbol'].split('/')[0]
+        if item not in self.balance:
+            self.balance[item] = {'free': 0, 'used': 0, 'total': 0}
         if order['status'] == 'open':
             # 매수 주문
-            if order['side'] == 'bid' and order['price'] >= self.get_current_price('BTC'):
+            if order['side'] == 'bid' and order['price'] >= self.get_current_price(item):
                 amount_krw = order['amount'] * order['price']
-                self.balance['BTC']['free'] += order['amount']
-                self.balance['BTC']['total'] += order['amount']
+                self.balance[item]['free'] += order['amount']
+                self.balance[item]['total'] += order['amount']
                 self.balance['KRW']['total'] -= amount_krw
                 self.balance['KRW']['used'] -= amount_krw
                 order['filled'] = order['amount']
@@ -104,21 +114,17 @@ class VirtualExchange(BaseExchange):
                 self.__open_order_id.remove(order_id)
             
             # 매도 주문    
-            elif order['side'] == 'ask' and order['price'] <= self.get_current_price('BTC'):
+            elif order['side'] == 'ask' and order['price'] <= self.get_current_price(item):
                 self.balance['KRW']['free'] += order['amount'] * order['price']
                 self.balance['KRW']['total'] += order['amount'] * order['price']
-                self.balance['BTC']['total'] -= order['amount']
-                self.balance['BTC']['used'] -= order['amount']
+                self.balance[item]['total'] -= order['amount']
+                self.balance[item]['used'] -= order['amount']
                 order['filled'] = order['amount']
                 order['status'] = 'closed'
                 self.__open_order_id.remove(order_id)
 
     def get_tickers(self):
         return self.tickers
-    
-    @abstractmethod
-    def get_buying_candidates(self):
-        pass
     
     @abstractmethod
     def get_ohlcv_per_1m(self, item):
