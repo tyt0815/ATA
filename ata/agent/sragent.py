@@ -50,7 +50,8 @@ class SRAgent(BaseAgent):
                 if symbol in ['BTC/KRW', 'ETH/KRW', 'XRP/KRW']:
                     continue
                 ticker = tickers[symbol]
-                if float(ticker['info']['acc_trade_price_24h']) > 100000000000:
+                percentage = ticker['percentage']
+                if float(ticker['info']['acc_trade_price_24h']) > 100000000000 and percentage >= 0.01:
                     buying_candidates.add(symbol.split('/')[0])
         return buying_candidates
     
