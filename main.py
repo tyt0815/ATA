@@ -2,6 +2,7 @@ import argparse
 import os
 
 from ata.agent.lhagent import LHAgent
+from ata.agent.sragent import SRAgent
 from ata.exchange.offlineexchangesimulator import OfflineExchangeSimulator
 from ata.exchange.upbitexchange import UpbitExchange
 from ata.exchange.upbitexchangesimulator import UpbitExchangeSimulator
@@ -13,6 +14,13 @@ def get_args():
         type=str,
         default="Upbit",
         choices=["Upbit", "OfflineSimul", "UpbitSimul"]
+    )
+    
+    parser.add_argument(
+        '--agent',
+        type=str,
+        default='LHA',
+        choices=['LHA', 'SRA']
     )
     
     parser.add_argument(
@@ -30,7 +38,7 @@ def get_args():
     parser.add_argument(
         '--only-btc',
         type=bool,
-        default=False
+        default=True
     )
     
     parser.add_argument(
@@ -72,13 +80,23 @@ if __name__ == "__main__":
             file_path=args.file_path
         )
     
-    agent = LHAgent(
-        exchange=exchange,
-        wait_time_for_buy_order=args.wait_time_for_buy_order,
-        wait_time_for_sell_order=args.wait_time_for_sell_order,
-        wait_time_for_cancel_sell_order=args.wait_time_for_cancel_sell_order,
-        only_btc=True,
-        end_condition=args.end_condition
-    )
+    if args.agent == 'LHA':
+        agent = LHAgent(
+            exchange=exchange,
+            wait_time_for_buy_order=args.wait_time_for_buy_order,
+            wait_time_for_sell_order=args.wait_time_for_sell_order,
+            wait_time_for_cancel_sell_order=args.wait_time_for_cancel_sell_order,
+            only_btc=args.only_btc,
+            end_condition=args.end_condition
+        )
+    elif args.agent == 'SRA':
+        agent = SRAgent(
+            exchange=exchange,
+            wait_time_for_buy_order=args.wait_time_for_buy_order,
+            wait_time_for_sell_order=args.wait_time_for_sell_order,
+            wait_time_for_cancel_sell_order=args.wait_time_for_cancel_sell_order,
+            only_btc=args.only_btc,
+            end_condition=args.end_condition
+        )
     
     agent.run()

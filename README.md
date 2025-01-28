@@ -9,7 +9,11 @@ conda activate ata
 
 # 백그라운드에서 실행 + 출력을 파일에
 ```
-nohup python -u main.py > $(date +'%Y%m%d_%H%M%S').log 2>&1 &
+nohup python -u main.py --only-btc True > $(date +'%Y%m%d_%H%M%S').log 2>&1 &
+
+nohup python -u main.py --mod UpbitSimul --only-btc True > $(date +'%Y%m%d_%H%M%S').log 2>&1 &
+
+nohup python -u main.py --mod UpbitSimul --only-btc False --agent SRA > $(date +'%Y%m%d_%H%M%S').log 2>&1 &
 ```
 
 # 백그라운드 실행중인 프로그램 종료

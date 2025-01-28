@@ -179,8 +179,8 @@ class BaseAgent():
                 self.exchange.init()
             finally:
                 continue
-        self.print_profits()
         log('end trading')
+        self.print_profits()
         return
     
     def __init_trading_data(self, item):
