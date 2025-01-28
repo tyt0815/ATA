@@ -78,8 +78,7 @@ class SRAgent(BaseAgent):
         '''
         return buy_price, buy_amount_item, buy_amount_krw
         '''
-        # buy_price = self.exchange.get_current_price(item)
-        buy_price = None
+        buy_price = self.exchange.get_current_price(item)
         buy_amount_krw = self.exchange.balance['KRW']['free'] - 100
         buy_amount_item = buy_amount_krw / buy_price
         return buy_price, buy_amount_item, buy_amount_krw
@@ -88,8 +87,7 @@ class SRAgent(BaseAgent):
         '''
         return sell_price, sell_amount_item, sell_amount_krw
         '''
-        # sell_price = self.exchange.get_current_price(item)
-        sell_price = None
+        sell_price = self.exchange.get_current_price(item)
         sell_amount_item = self.exchange.balance[item]['free']
         sell_amount_krw = sell_price * sell_amount_item
         return sell_price, sell_amount_item, sell_amount_krw
