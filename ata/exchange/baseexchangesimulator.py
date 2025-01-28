@@ -141,3 +141,7 @@ class BaseExchangeSimulator(BaseExchange):
     @abstractmethod
     def get_time(self):
         pass
+    
+    @abstractmethod
+    def get_market_events(self):
+        pass

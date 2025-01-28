@@ -60,13 +60,13 @@ if __name__ == "__main__":
     for arg, value in vars(args).items():
         print(f"{arg}: {value}")
     print()
-    if args.mod == "Offline":
-        exchange = OfflineExchangeSimulator(args.file_path)
-    elif args.mod == 'Upbit':
+    if args.mod == 'Upbit':
         exchange = UpbitExchange(
             end_condition=args.end_condition,
             file_path=args.file_path
         )
+    elif args.mod == "OfflineSimul":
+        exchange = OfflineExchangeSimulator(args.file_path)
     elif args.mod == 'UpbitSimul':
         exchange=UpbitExchangeSimulator(
             file_path=args.file_path

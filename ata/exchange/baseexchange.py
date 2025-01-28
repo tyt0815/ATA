@@ -78,3 +78,7 @@ class BaseExchange:
     @abstractmethod
     def get_tickers(self):
         pass
+    
+    @abstractmethod
+    def get_market_events(self):
+        pass

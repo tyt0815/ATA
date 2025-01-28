@@ -43,6 +43,7 @@ class BaseAgent():
                 if self.exchange.get_total_balance() < top_value * self.end_condition:
                     log(f'Top value: {top_value}, Current balance: {self.exchange.get_total_balance()}')
                     break
+                market_events = self.exchange.get_market_events()
                 # 매수 주문 알고리즘
                 buying_candidates = monitoring_target.union(self._get_buying_candidates())
                 for target in buying_candidates:
@@ -53,7 +54,7 @@ class BaseAgent():
                     data = self.trading_data[target]
                     
                     # 매수 주문 타이밍 시 매수 주문
-                    if self.exchange.get_time() - data['last_buy_time'] >= self.wait_time_for_buy_order and self._is_buy_timing(target):
+                    if market_events[target]['warning'] is False and self.exchange.get_time() - data['last_buy_time'] >= self.wait_time_for_buy_order and self._is_buy_timing(target):
                         monitoring_target.add(target)
                         curr_price = self.exchange.get_current_price(target)
                         data['last_buy_time'] = self.exchange.get_time()
@@ -231,7 +232,6 @@ class BaseAgent():
         '''
         pass
     
-    # property
     @abstractmethod
     def _calc_buy_skip_criterion(self, item) -> int:
         pass

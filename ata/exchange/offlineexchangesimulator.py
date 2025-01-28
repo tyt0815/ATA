@@ -75,3 +75,19 @@ class OfflineExchangeSimulator(BaseExchangeSimulator):
                 'close': 'last',
                 'volume': 'sum'
         }).reset_index(drop=True)).copy()  # 그룹 컬럼 제거
+        
+    def get_market_events(self):
+        return {
+            'BTC': 
+            {
+                'warning': False,
+                'caution':
+                {
+                    'CONCENTRATION_OF_SMALL_ACCOUNTS': False,
+                    'DEPOSIT_AMOUNT_SOARING': False,
+                    'GLOBAL_PRICE_DIFFERENCES': False,
+                    'PRICE_FLUCTUATIONS': False,
+                    'TRADING_VOLUME_SOARING': False
+                },
+            }
+            }

@@ -1,9 +1,10 @@
 import ccxt
 import time
 import pandas as pd
+import requests
 
 from ata.exchange.baseexchange import BaseExchange
-from ata.utils.log import log    
+from ata.utils.log import log
 
 class UpbitExchange(BaseExchange):
     def __init__(
@@ -48,6 +49,7 @@ class UpbitExchange(BaseExchange):
         self.ohlcvs_1m = {}
         self.ohlcvs_15m = {}
         self.ohlcvs_1h = {}
+        self.market_events = self.__get_market_events()
         self.balance = self.exchange.fetch_balance()
         self.tickers = self.exchange.fetch_tickers()
         if self.end_condition < 1.0 and self.end_value < self.get_total_balance() * self.end_condition:
@@ -179,3 +181,28 @@ class UpbitExchange(BaseExchange):
     
     def get_tickers(self):
         return self.tickers
+    
+    def __get_market_events(self) -> dict:
+        url = "https://api.upbit.com/v1/market/all?is_details=true"
+        headers = {"accept": "application/json"}
+        res = requests.get(url, headers=headers)
+        infos = res.json()
+        result = {}
+        for info in infos:
+            data = {
+                'warning': info['market_event']['warning'],
+                'caution':
+                {
+                    'CONCENTRATION_OF_SMALL_ACCOUNTS': info['market_event']['caution']['CONCENTRATION_OF_SMALL_ACCOUNTS'],
+                    'DEPOSIT_AMOUNT_SOARING': info['market_event']['caution']['DEPOSIT_AMOUNT_SOARING'],
+                    'GLOBAL_PRICE_DIFFERENCES': info['market_event']['caution']['GLOBAL_PRICE_DIFFERENCES'],
+                    'PRICE_FLUCTUATIONS': info['market_event']['caution']['PRICE_FLUCTUATIONS'],
+                    'TRADING_VOLUME_SOARING': info['market_event']['caution']['TRADING_VOLUME_SOARING']
+                },
+            }
+            
+            result[info['market'].split('-')[-1]] = data
+        return result
+    
+    def get_market_events(self):
+        return self.market_events
