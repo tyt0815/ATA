@@ -37,8 +37,7 @@ def get_args():
     
     parser.add_argument(
         '--only-btc',
-        type=bool,
-        default=True
+        action='store_true',
     )
     
     parser.add_argument(
