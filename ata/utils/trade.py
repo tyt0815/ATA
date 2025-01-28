@@ -79,9 +79,9 @@ def calc_mfi(df, period=14, force_calc = False):
         raw_money_flow = typical_price * df['volume']
         
         # Positive/Negative Money Flow 구분
-        price_change = typical_price.diff()
-        positive_money_flow = np.where(price_change > 0, raw_money_flow, 0)
-        negative_money_flow = np.where(price_change < 0, raw_money_flow, 0)
+        positive_money_flow = np.where(typical_price > typical_price.shift(1), raw_money_flow, 0)
+        negative_money_flow = np.where(typical_price < typical_price.shift(1), raw_money_flow, 0)
+
         
         # Rolling sums for the given period
         positive_mf_sum = pd.Series(positive_money_flow).rolling(window=period).sum()
