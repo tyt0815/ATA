@@ -44,7 +44,7 @@ class SRAgent(BaseAgent):
         b_key = keys['b_key']
         
         # 가격이 볼린저 밴드 상단에 닿지 못하는가
-        if ohlcv_15m[upper_key].iloc[-1] < ohlcv_15m["close"].iloc[-1]:
+        if ohlcv_15m[upper_key].iloc[-2] < ohlcv_15m["close"].iloc[-1]:
             return False
         
         # 볼린저 %b가 0이상인가
@@ -54,7 +54,7 @@ class SRAgent(BaseAgent):
         # mfi가 80 이하인가
         mfi_period = 14
         ohlcv_15m, mfi_key = trade.calc_mfi(ohlcv_15m, period=mfi_period)
-        if ohlcv_15m[mfi_key].iloc[-1] > 80:
+        if ohlcv_15m[mfi_key].iloc[-2] > 80:
             return False
         
         return True
@@ -78,8 +78,9 @@ class SRAgent(BaseAgent):
         '''
         return buy_price, buy_amount_item, buy_amount_krw
         '''
-        buy_price = self.exchange.get_current_price(item)
-        buy_amount_krw = self.exchange.balance['KRW']['free']
+        # buy_price = self.exchange.get_current_price(item)
+        buy_price = None
+        buy_amount_krw = self.exchange.balance['KRW']['free'] - 100
         buy_amount_item = buy_amount_krw / buy_price
         return buy_price, buy_amount_item, buy_amount_krw
     
@@ -87,7 +88,8 @@ class SRAgent(BaseAgent):
         '''
         return sell_price, sell_amount_item, sell_amount_krw
         '''
-        sell_price = self.exchange.get_current_price(item)
+        # sell_price = self.exchange.get_current_price(item)
+        sell_price = None
         sell_amount_item = self.exchange.balance[item]['free']
         sell_amount_krw = sell_price * sell_amount_item
         return sell_price, sell_amount_item, sell_amount_krw
