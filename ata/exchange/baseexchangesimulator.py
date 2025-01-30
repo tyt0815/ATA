@@ -131,6 +131,10 @@ class BaseExchangeSimulator(BaseExchange):
         pass
     
     @abstractmethod
+    def get_ohlcv_per_5m(self, item):
+        pass
+    
+    @abstractmethod
     def get_ohlcv_per_15m(self, item):
         pass
     
@@ -145,3 +149,4 @@ class BaseExchangeSimulator(BaseExchange):
     @abstractmethod
     def get_market_events(self):
         pass
+    

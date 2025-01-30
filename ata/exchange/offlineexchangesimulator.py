@@ -36,6 +36,7 @@ class OfflineExchangeSimulator(BaseExchangeSimulator):
             return False
         
         self.ohlcvs_1m = {'BTC/KRW':self.data.iloc[self.idx + 1 - self.__ohlcv_len:self.idx + 1].copy()}
+        self.ohlcvs_5m = {'BTC/KRW':self.__to_per_minute(5)}
         self.ohlcvs_15m = {'BTC/KRW':self.__to_per_minute(15)}
         self.ohlcvs_1h = {'BTC/KRW':self.__to_per_minute(60)}
         self.tickers = {'BTC/KRW': self.data.iloc[self.idx]}
@@ -47,6 +48,11 @@ class OfflineExchangeSimulator(BaseExchangeSimulator):
         if item == 'KRW':
             return None
         return self.ohlcvs_1m[item+'/KRW']
+    
+    def get_ohlcv_per_5m(self, item):
+        if item == 'KRW':
+            return None
+        return self.ohlcvs_5m[item+'/KRW']
     
     def get_ohlcv_per_15m(self, item):
         if item == 'KRW':

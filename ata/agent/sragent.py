@@ -9,31 +9,31 @@ from ata.utils import trade
 
 class SRAgent(BaseAgent):
     def _is_buy_timing(self, item) -> bool:
-        ohlcv_1h = self.exchange.get_ohlcv_per_1h(item)
-        ohlcv_1h, keys = trade.calc_bollinger_bands(ohlcv_1h, 20, 2)
+        ohlcv_5m = self.exchange.get_ohlcv_per_5m(item)
+        ohlcv_5m, keys = trade.calc_bollinger_bands(ohlcv_5m, 20, 2)
         upper_key = keys['upper_key']
         lower_key = keys['lower_key']
         b_key = keys['b_key']
-        ohlcv_1h, mfi_key = trade.calc_mfi(ohlcv_1h, 14)
+        ohlcv_5m, mfi_key = trade.calc_mfi(ohlcv_5m, 14)
         if (
-            ohlcv_1h[mfi_key].iloc[-2] < 20 and
-            ohlcv_1h[b_key].iloc[-2] < 0
+            ohlcv_5m['volume'].iloc[-2] * 10 <= ohlcv_5m['volume'].iloc[-1] and
+            ohlcv_5m[b_key].iloc[-1] > 1 and
+            ohlcv_5m[mfi_key].iloc[-1] > 80
         ):
             return True
         else:
             return False
     
     def _is_sell_timing(self, item) -> bool:
-        ohlcv_1h = self.exchange.get_ohlcv_per_1h(item)
-        ohlcv_1h, keys = trade.calc_bollinger_bands(ohlcv_1h, 20, 2)
+        ohlcv_5m = self.exchange.get_ohlcv_per_5m(item)
+        ohlcv_5m, keys = trade.calc_bollinger_bands(ohlcv_5m, 20, 2)
         upper_key = keys['upper_key']
         lower_key = keys['lower_key']
         b_key = keys['b_key']
-        ohlcv_1h, mfi_key = trade.calc_mfi(ohlcv_1h, 14)
-        prev_mfi = ohlcv_1h[mfi_key].iloc[-2] if ohlcv_1h[mfi_key].iloc[-2] != 80 else ohlcv_1h[mfi_key].iloc[-3]
+        ohlcv_5m, mfi_key = trade.calc_mfi(ohlcv_5m, 14)
         if (
-            prev_mfi > 80 and
-            (80 - ohlcv_1h[mfi_key].iloc[-1]) * (80 - prev_mfi) <= 0
+            ohlcv_5m[b_key].iloc[-1] < 1 and
+            ohlcv_5m[mfi_key].iloc[-1] < 80
         ):
             return True
         else:
@@ -51,7 +51,7 @@ class SRAgent(BaseAgent):
                     continue
                 ticker = tickers[symbol]
                 percentage = ticker['percentage']
-                if float(ticker['info']['acc_trade_price_24h']) > 100000000000 and percentage >= 0.01:
+                if float(ticker['info']['acc_trade_price_24h']) > 50000000000:
                     buying_candidates.add(symbol.split('/')[0])
         return buying_candidates
     
@@ -60,8 +60,8 @@ class SRAgent(BaseAgent):
         return buy_price, buy_amount_item, buy_amount_krw
         '''
         curr_price = self.exchange.get_current_price(item)
-        buy_price = curr_price - upbit_price_unit(item, curr_price) * max(2 + self._calc_buy_skip_criterion(item) - self.trading_data[item]['buy_cnt'], 0)
-        buy_amount_krw = min(self.exchange.get_total_balance() / 5 * (self.trading_data[item]['buy_cnt'] - self._calc_buy_skip_criterion(item)), self.exchange.balance['KRW']['free'] - 100)
+        buy_price = curr_price
+        buy_amount_krw = self.exchange.balance['KRW']['free'] - 10
         buy_amount_item = buy_amount_krw / buy_price
         return buy_price, buy_amount_item, buy_amount_krw
     
@@ -70,15 +70,14 @@ class SRAgent(BaseAgent):
         return sell_price, sell_amount_item, sell_amount_krw
         '''
         curr_price = self.exchange.get_current_price(item)
-        sell_price = curr_price + upbit_price_unit(item, curr_price) * max(0, 2 - self.trading_data[item]['sell_cnt'])
-        denominator = 2.0
-        weight = min(denominator, self.trading_data[item]['sell_cnt']) / denominator
-        sell_amount_item = self.exchange.balance[item]['free'] * weight
+        sell_price = curr_price
+        sell_amount_item = self.exchange.balance[item]['free']
         sell_amount_krw = sell_amount_item * sell_price
         return sell_price, sell_amount_item, sell_amount_krw
     
     def _calc_buy_skip_criterion(self, item) -> int:
-        return np.median(self.trading_data[item]['buy_cnt_histories']) - 1
+        # return np.median(self.trading_data[item]['buy_cnt_histories']) - 1
+        return 0
     
     def _calc_sell_skip_criterion(self, item) -> int:
         return 0

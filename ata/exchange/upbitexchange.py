@@ -47,6 +47,7 @@ class UpbitExchange(BaseExchange):
     
     def update(self) -> bool:
         self.ohlcvs_1m = {}
+        self.ohlcvs_5m = {}
         self.ohlcvs_15m = {}
         self.ohlcvs_1h = {}
         self.market_events = self.__get_market_events()
@@ -58,22 +59,6 @@ class UpbitExchange(BaseExchange):
             return False
         
         return True
-    
-    # def get_buying_candidates(self):
-    #     buying_candidates = set()
-    #     buying_candidates.add('BTC')
-    #     if self.only_btc:
-    #         return buying_candidates
-    #     symbols = self.tickers.keys()
-    #     krw_symbols = [x for x in symbols if x.endswith('KRW')]
-    #     low_percentage = -0.05
-    #     high_percentage = max(0.03, self.tickers['BTC/KRW']['percentage'])
-    #     for symbol in krw_symbols:
-    #         ticker = self.tickers[symbol]
-    #         percentage = ticker['percentage']
-    #         if float(ticker['info']['acc_trade_price_24h']) > 100000000000 and percentage >= low_percentage and percentage < high_percentage:
-    #             buying_candidates.add(symbol.split('/')[0])
-    #     return buying_candidates
     
     def create_buy_order(self, item, price, amount_item):
         resp = self.exchange.create_limit_buy_order(
@@ -120,6 +105,18 @@ class UpbitExchange(BaseExchange):
             except:
                 return None
         return self.ohlcvs_1m[item]
+    
+    def get_ohlcv_per_5m(self, item):
+        if not item in self.ohlcvs_5m:
+            try:
+                ohlcv = self.exchange.fetch_ohlcv(
+                    symbol=f'{item}/KRW',
+                    timeframe='5m'
+                )
+                self.ohlcvs_5m[item] = self.__preprocess_ohlcv(ohlcv)
+            except:
+                return None
+        return self.ohlcvs_5m[item]
     
     def get_ohlcv_per_15m(self, item):
         if not item in self.ohlcvs_15m:
