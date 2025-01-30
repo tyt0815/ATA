@@ -41,6 +41,7 @@ class UpbitExchangeSimulator(BaseExchangeSimulator):
     
     def update(self):
         self.ohlcvs_1m = {}
+        self.ohlcvs_5m = {}
         self.ohlcvs_15m = {}
         self.ohlcvs_1h = {}
         self.market_events = self.__get_market_events()
