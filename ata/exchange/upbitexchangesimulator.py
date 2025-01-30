@@ -60,6 +60,18 @@ class UpbitExchangeSimulator(BaseExchangeSimulator):
                 return None
         return self.ohlcvs_1m[item]
     
+    def get_ohlcv_per_5m(self, item):
+        if not item in self.ohlcvs_5m:
+            try:
+                ohlcv = self.exchange.fetch_ohlcv(
+                    symbol=f'{item}/KRW',
+                    timeframe='5m'
+                )
+                self.ohlcvs_5m[item] = self.__preprocess_ohlcv(ohlcv)
+            except:
+                return None
+        return self.ohlcvs_5m[item]
+    
     def get_ohlcv_per_15m(self, item):
         if not item in self.ohlcvs_15m:
             try:
