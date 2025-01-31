@@ -2,6 +2,7 @@ from abc import abstractmethod
 from collections import deque
 import numpy as np
 import traceback
+import time
 from pprint import pprint
 
 from ata.exchange.baseexchange import BaseExchange
@@ -17,6 +18,7 @@ class BaseAgent():
         wait_time_for_cancel_sell_order,
         only_btc,
         end_condition,
+        debug: bool,
         log_path = './log'
         ):
         self.exchange = exchange
@@ -25,6 +27,7 @@ class BaseAgent():
         self.wait_time_for_sell_order = max(0, wait_time_for_sell_order)
         self.wait_time_for_cancel_sell_order = wait_time_for_cancel_sell_order
         self.only_btc = only_btc
+        self.debug: bool = debug
         self.log_path = log_path
         self.end_condition = end_condition
         self.start_value = self.top_value = 1
@@ -38,6 +41,7 @@ class BaseAgent():
         self.top_value = self.start_value
         log(f'trading start \ntotal: {format_float(self.exchange.get_total_balance(), 10):<10}')
         while True:
+            start = time.time()
             try:
                 if self.exchange.update() == False:
                     break
@@ -161,13 +165,14 @@ class BaseAgent():
                         data['buy_amount'] = max(0, data['buy_amount'] - sell_amount)
                         log(f'Sell {item}\ntotal: {format_float(self.exchange.get_total_balance(), 10):<10}, total profit%: {format_float(self.total_profit_percent, 10):<10}, current_price: {format_float(curr_price, 12):<12}, price: {format_float(sell_price_avg, 12):<12}, amount_krw: {format_float(sell_price_avg * sell_amount, 7):<7}, profit: {format_float(profit, 6):<6}')
                         self.print_profits()
-                
+            
             except KeyboardInterrupt as e:
                 break
             except:
                 save_log(traceback.format_exc(), self.log_path)
                 self.exchange.init()
-            
+            end = time.time()
+            self.debug_log(format_float(end - start, 5))
         self._end_trading()
             
     def _end_trading(self):
@@ -206,6 +211,10 @@ class BaseAgent():
         
     def print_profits(self):
         pprint({temp:format_float(self.trading_data[temp]['profit'], 10) for temp in self.trading_data})
+    
+    def debug_log(self, s):
+        if self.debug:
+            log(f'Debug\n{s}')
         
     @property
     def total_profit_percent(self):

@@ -133,3 +133,6 @@ class UpbitExchangeSimulator(BaseExchangeSimulator):
     
     def get_market_events(self):
         return self.market_events
+    
+    def get_order_book(self, item):
+        return self.exchange.fetch_order_book(symbol=f'{item}/KRW')

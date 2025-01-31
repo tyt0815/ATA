@@ -58,6 +58,11 @@ def get_args():
         default=60
     )
     
+    parser.add_argument(
+        '--debug',
+        action='store_true',
+    )
+    
     return parser.parse_args()
 
 if __name__ == "__main__":
@@ -86,6 +91,7 @@ if __name__ == "__main__":
             wait_time_for_sell_order=args.wait_time_for_sell_order,
             wait_time_for_cancel_sell_order=args.wait_time_for_cancel_sell_order,
             only_btc=args.only_btc,
+            debug=args.debug,
             end_condition=args.end_condition
         )
     elif args.agent == 'SRA':
@@ -95,6 +101,7 @@ if __name__ == "__main__":
             wait_time_for_sell_order=args.wait_time_for_sell_order,
             wait_time_for_cancel_sell_order=args.wait_time_for_cancel_sell_order,
             only_btc=args.only_btc,
+            debug=args.debug,
             end_condition=args.end_condition
         )
     

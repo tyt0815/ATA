@@ -86,3 +86,7 @@ class BaseExchange:
     @abstractmethod
     def get_market_events(self):
         pass
+    
+    @abstractmethod
+    def get_order_book(self, item):
+        pass
