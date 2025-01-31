@@ -41,7 +41,7 @@ class LHAgent(BaseAgent):
         '''
         curr_price = self.exchange.get_current_price(item)
         buy_price = curr_price - upbit_price_unit(item, curr_price) * max(2 + self._calc_buy_skip_criterion(item) - self.trading_data[item]['buy_cnt'], 0)
-        buy_amount_krw = min(self.exchange.get_total_balance() / 5 * (self.trading_data[item]['buy_cnt'] - self._calc_buy_skip_criterion(item)), self.exchange.balance['KRW']['free'] - 100)
+        buy_amount_krw = min(self.exchange.get_total_balance() / 5 * (self.trading_data[item]['buy_cnt'] - self._calc_buy_skip_criterion(item)), self.exchange.balance['KRW']['free'] * 0.94)
         buy_amount_item = buy_amount_krw / buy_price
         return buy_price, buy_amount_item, buy_amount_krw
     
@@ -61,6 +61,6 @@ class LHAgent(BaseAgent):
         return np.median(self.trading_data[item]['buy_cnt_histories']) - 1
     
     def _calc_sell_skip_criterion(self, item) -> int:
-        return np.median(self.trading_data[item]['sell_cnt_histories']) - 1
+        return np.median(self.trading_data[item]['sell_cnt_histories']) - 2
     
     

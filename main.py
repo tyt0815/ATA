@@ -55,7 +55,7 @@ def get_args():
     parser.add_argument(
         '--wait-time-for-cancel-sell-order',
         type=float,
-        default=60 * 2
+        default=60
     )
     
     parser.add_argument(
