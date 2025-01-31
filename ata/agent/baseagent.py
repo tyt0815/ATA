@@ -68,6 +68,7 @@ class BaseAgent():
                         curr_price = self.exchange.get_current_price(target)
                         data['last_buy_time'] = self.exchange.get_time()
                         data['buy_cnt'] += 1
+                        data['sell_cnt_histories'].append(data['sell_cnt'])
                         data['sell_cnt'] = 0
                         if data['buy_cnt'] > self._calc_buy_skip_criterion(target):
                             buy_price, buy_amount_item, buy_amount_krw = self._calc_values_for_buy_order(target)
@@ -200,6 +201,7 @@ class BaseAgent():
             'buy_cnt' : 0,
             'sell_cnt' : 0,
             'buy_cnt_histories' : deque([0], maxlen=5),
+            'sell_cnt_histories' : deque([0], maxlen=5),
             'buy_order_infos' : [],
             'sell_order_infos' : [],
             'buy_price_avg' : 0,

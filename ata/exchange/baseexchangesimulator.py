@@ -5,7 +5,7 @@ from ata.exchange.baseexchange import BaseExchange
 class BaseExchangeSimulator(BaseExchange):
     def __init__(
         self,
-        balance = 100000
+        balance = 1000000
         ):
         super().__init__()
         

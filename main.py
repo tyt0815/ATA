@@ -32,7 +32,7 @@ def get_args():
     parser.add_argument(
         '--end-condition',
         type=float,
-        default=0.8
+        default=0.9
     )
     
     parser.add_argument(
@@ -55,7 +55,7 @@ def get_args():
     parser.add_argument(
         '--wait-time-for-cancel-sell-order',
         type=float,
-        default=60
+        default=60 * 2
     )
     
     parser.add_argument(

@@ -61,6 +61,6 @@ class LHAgent(BaseAgent):
         return np.median(self.trading_data[item]['buy_cnt_histories']) - 1
     
     def _calc_sell_skip_criterion(self, item) -> int:
-        return 0
+        return np.median(self.trading_data[item]['sell_cnt_histories']) - 1
     
     
