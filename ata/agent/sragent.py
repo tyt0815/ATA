@@ -15,12 +15,12 @@ class SRAgent(BaseAgent):
         price_rise_rate = ohlcv_1m['close'].iloc[-1] / ohlcv_1m['close'].iloc[-2]
         order_book = self.exchange.get_order_book(item)
         # 매수벽
-        bid_volume = sum(bid[1] for bid in order_book["bids"][:10])
+        bid_volume = sum(bid[1] for bid in order_book["bids"])
         # 매도벽
-        ask_volume = sum(ask[1] for ask in order_book["asks"][:10])
+        ask_volume = sum(ask[1] for ask in order_book["asks"])
         if (
             volume_rise_rate >= 3 and
-            price_rise_rate >= 0.01 and
+            price_rise_rate >= 1.01 and
             bid_volume > ask_volume * 2
         ):
             return True
@@ -44,9 +44,9 @@ class SRAgent(BaseAgent):
     def _is_sell_timing(self, item) -> bool:
         order_book = self.exchange.get_order_book(item)
         # 매수벽
-        bid_volume = sum(bid[1] for bid in order_book["bids"][:10])
+        bid_volume = sum(bid[1] for bid in order_book["bids"])
         # 매도벽
-        ask_volume = sum(ask[1] for ask in order_book["asks"][:10])
+        ask_volume = sum(ask[1] for ask in order_book["asks"])
         if(
             bid_volume < ask_volume
         ):
