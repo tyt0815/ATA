@@ -16,9 +16,9 @@ class SRAgent(BaseAgent):
         b_key = keys['b_key']
         ohlcv_5m, mfi_key = trade.calc_mfi(ohlcv_5m, 14)
         if (
-            ohlcv_5m['volume'].iloc[-2] * 10 <= ohlcv_5m['volume'].iloc[-1] and
-            ohlcv_5m[b_key].iloc[-1] > 1 and
-            ohlcv_5m[mfi_key].iloc[-1] > 80
+            ohlcv_5m['volume'].iloc[-2] * 3 <= ohlcv_5m['volume'].iloc[-1] and
+            # ohlcv_5m[b_key].iloc[-1] > 1 and
+            ohlcv_5m[mfi_key].iloc[-1] > 70
         ):
             return True
         else:
