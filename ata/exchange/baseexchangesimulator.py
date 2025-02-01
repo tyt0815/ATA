@@ -31,7 +31,7 @@ class BaseExchangeSimulator(BaseExchange):
         return True
     
     def create_buy_order(self, item, price, amount_item):
-        krw = price * amount_item
+        krw = price * amount_item * 1.0005
         if krw > self.balance['KRW']['free']: 
             raise Exception(f'KRW 초과(request: {krw}, remained: {self.balance["KRW"]["free"]})')
         self.balance['KRW']['free'] -= krw
@@ -41,7 +41,7 @@ class BaseExchangeSimulator(BaseExchange):
     
     def create_buy_order_at_market_price(self, item, amount_krw):
         curr_price = self.get_current_price(item=item)
-        order_id = self.create_buy_order(item=item, price=curr_price,amount_item=amount_krw / curr_price)
+        order_id = self.create_buy_order(item=item, price=curr_price,amount_item=amount_krw / curr_price * 10000 / 10005)
         self.__process_order(order_id)
         return order_id
     
@@ -104,7 +104,7 @@ class BaseExchangeSimulator(BaseExchange):
         if order['status'] == 'open':
             # 매수 주문
             if order['side'] == 'bid' and order['price'] >= self.get_current_price(item):
-                amount_krw = order['amount'] * order['price']
+                amount_krw = order['amount'] * order['price'] * 1.0005
                 self.balance[item]['free'] += order['amount']
                 self.balance[item]['total'] += order['amount']
                 self.balance['KRW']['total'] -= amount_krw
@@ -115,8 +115,9 @@ class BaseExchangeSimulator(BaseExchange):
             
             # 매도 주문    
             elif order['side'] == 'ask' and order['price'] <= self.get_current_price(item):
-                self.balance['KRW']['free'] += order['amount'] * order['price']
-                self.balance['KRW']['total'] += order['amount'] * order['price']
+                amount_krw = order['amount'] * order['price'] * 0.9995
+                self.balance['KRW']['free'] += amount_krw
+                self.balance['KRW']['total'] += amount_krw
                 self.balance[item]['total'] -= order['amount']
                 self.balance[item]['used'] -= order['amount']
                 order['filled'] = order['amount']

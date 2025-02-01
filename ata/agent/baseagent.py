@@ -111,7 +111,7 @@ class BaseAgent():
                                 buy_amounts.append(order['filled'])
                         data['buy_order_infos'].clear()
                         if len(buy_amounts) > 0:
-                            buy_price_avg = np.average(buy_prices, weights=buy_amounts)
+                            buy_price_avg = np.average(buy_prices, weights=buy_amounts) * 1.0005
                             buy_amount = np.sum(buy_amounts)
                             log(f'Buy {target}\ntotal: {format_float(self.exchange.get_total_balance(), 10):<10}, total profit%: {format_float(self.total_profit_percent, 10):<10}, current_price: {format_float(curr_price, 12):<12}, price: {format_float(buy_price_avg, 12):<12}, amount_krw: {format_float(buy_price_avg * buy_amount, 7):<7}')
                             data['buy_price_avg'] = (data['buy_price_avg'] * data['buy_amount'] + buy_price_avg * buy_amount) / (data['buy_amount'] + buy_amount)
@@ -159,7 +159,7 @@ class BaseAgent():
                             data['sell_order_infos'].remove(order_info)
                     
                     if len(sell_amounts) > 0:
-                        sell_price_avg = np.average(sell_prices, weights=sell_amounts)
+                        sell_price_avg = np.average(sell_prices, weights=sell_amounts) * 0.9995
                         sell_amount = np.sum(sell_amounts)
                         profit = (sell_price_avg - data['buy_price_avg']) * min(sell_amount, data['buy_amount'])
                         data['profit'] += profit
