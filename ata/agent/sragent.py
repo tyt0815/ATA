@@ -13,61 +13,30 @@ class SRAgent(BaseAgent):
         volume_mean = np.mean(ohlcv_1m['volume'].iloc[-6:-1])
         volume_rise_rate = ohlcv_1m['volume'].iloc[-1] / volume_mean
         price_rise_rate = ohlcv_1m['close'].iloc[-1] / ohlcv_1m['close'].iloc[-2]
-        # order_book = self.exchange.get_order_book(item)
-        # # 매수벽
-        # bid_volume = sum(bid[1] for bid in order_book["bids"])
-        # # 매도벽
-        # ask_volume = sum(ask[1] for ask in order_book["asks"])
+        order_book = self.exchange.get_order_book(item)
+        # 매수벽
+        bid_volume = sum(bid[1] for bid in order_book["bids"])
+        # 매도벽
+        ask_volume = sum(ask[1] for ask in order_book["asks"])
         if (
-            volume_rise_rate >= 3 
+            volume_rise_rate >= 2
             and price_rise_rate >= 1.01
-            # and bid_volume > ask_volume * 2
+            and bid_volume > ask_volume * 2
         ):
             return True
         return False
-        
-        # ohlcv_5m = self.exchange.get_ohlcv_per_5m(item)
-        # ohlcv_5m, keys = trade.calc_bollinger_bands(ohlcv_5m, 20, 2)
-        # upper_key = keys['upper_key']
-        # lower_key = keys['lower_key']
-        # b_key = keys['b_key']
-        # ohlcv_5m, mfi_key = trade.calc_mfi(ohlcv_5m, 14)
-        # if (
-        #     ohlcv_5m['volume'].iloc[-2] * 3 <= ohlcv_5m['volume'].iloc[-1] and
-        #     # ohlcv_5m[b_key].iloc[-1] > 1 and
-        #     ohlcv_5m[mfi_key].iloc[-1] > 50
-        # ):
-        #     return True
-        # else:
-        #     return False
     
     def _is_sell_timing(self, item) -> bool:
-        # order_book = self.exchange.get_order_book(item)
-        # # 매수벽
-        # bid_volume = sum(bid[1] for bid in order_book["bids"])
-        # # 매도벽
-        # ask_volume = sum(ask[1] for ask in order_book["asks"])
-        # if(
-        #     bid_volume < ask_volume
-        # ):
-        #     return True
-        # return False
-    
-        
-        ohlcv_5m = self.exchange.get_ohlcv_per_5m(item)
-        ohlcv_5m, keys = trade.calc_bollinger_bands(ohlcv_5m, 20, 2)
-        upper_key = keys['upper_key']
-        lower_key = keys['lower_key']
-        b_key = keys['b_key']
-        ohlcv_5m, mfi_key = trade.calc_mfi(ohlcv_5m, 14)
-        if (
-            ohlcv_5m['volume'].iloc[-2] / 2 > ohlcv_5m['volume'].iloc[-1] and
-            ohlcv_5m[b_key].iloc[-1] < 1 and
-            ohlcv_5m[mfi_key].iloc[-1] < 80
+        order_book = self.exchange.get_order_book(item)
+        # 매수벽
+        bid_volume = sum(bid[1] for bid in order_book["bids"])
+        # 매도벽
+        ask_volume = sum(ask[1] for ask in order_book["asks"])
+        if(
+            bid_volume < ask_volume
         ):
             return True
-        else:
-            return False
+        return False
     
     def _get_buying_candidates(self) -> set:
         buying_candidates = set()
@@ -77,11 +46,11 @@ class SRAgent(BaseAgent):
             symbols = tickers.keys()
             krw_symbols = [x for x in symbols if x.endswith('KRW')]
             for symbol in krw_symbols:
-                if symbol in ['BTC/KRW', 'ETH/KRW', 'XRP/KRW']:
+                if symbol in ['BTC/KRW']:
                     continue
                 ticker = tickers[symbol]
                 percentage = ticker['percentage']
-                if float(ticker['info']['acc_trade_price_24h']) > 10000000000:
+                if float(ticker['info']['acc_trade_price_24h']) > 5000000000:
                     buying_candidates.add(symbol.split('/')[0])
         return buying_candidates
     

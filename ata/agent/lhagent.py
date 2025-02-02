@@ -19,12 +19,14 @@ class LHAgent(BaseAgent):
     
     def _get_buying_candidates(self) -> set:
         buying_candidates = set()
-        buying_candidates.add('BTC')
+        tickers = self.exchange.get_tickers()
+        btc_ticker = tickers['BTC/KRW']
+        if btc_ticker['percentage'] > 0:
+            buying_candidates.add('BTC')
         if not self.only_btc:
-            tickers = self.exchange.get_tickers()
             symbols = tickers.keys()
             krw_symbols = [x for x in symbols if x.endswith('KRW')]
-            low_percentage = -0.05
+            low_percentage = 0
             high_percentage = 0.05
             for symbol in krw_symbols:
                 if symbol == 'BTC/KRW':

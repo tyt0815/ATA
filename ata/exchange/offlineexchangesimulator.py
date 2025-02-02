@@ -21,7 +21,7 @@ class OfflineExchangeSimulator(BaseExchangeSimulator):
                 'BTC': {'free': 0, 'used': 0, 'total': 0}
             }
         
-        self.__ohlcv_len = 20
+        self.__ohlcv_len = 100
         
         offset = 60 * self.__ohlcv_len # 60분 * self.__ohlcv_len
         assert offset <= len(self.data), f"error: not enough offline data ({offset} {len(self.data)})"
