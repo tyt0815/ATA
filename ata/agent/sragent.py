@@ -50,7 +50,7 @@ class SRAgent(BaseAgent):
                     continue
                 ticker = tickers[symbol]
                 percentage = ticker['percentage']
-                if float(ticker['info']['acc_trade_price_24h']) > 5000000000:
+                if float(ticker['info']['acc_trade_price_24h']) > 5000000000 and percentage > 0:
                     buying_candidates.add(symbol.split('/')[0])
         return buying_candidates
     
