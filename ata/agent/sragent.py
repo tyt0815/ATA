@@ -19,9 +19,9 @@ class SRAgent(BaseAgent):
         # 매도벽
         ask_volume = sum(ask[1] for ask in order_book["asks"])
         if (
-            volume_rise_rate >= 2
-            and price_rise_rate >= 1.01
-            and bid_volume > ask_volume * 2
+            volume_rise_rate >= 3
+            and price_rise_rate >= 1.02
+            and bid_volume > ask_volume * 3
         ):
             return True
         return False
