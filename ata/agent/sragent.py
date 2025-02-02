@@ -60,7 +60,7 @@ class SRAgent(BaseAgent):
         '''
         curr_price = self.exchange.get_current_price(item)
         buy_price = curr_price
-        buy_amount_krw = self.exchange.balance['KRW']['free'] - 10
+        buy_amount_krw = self.exchange.balance['KRW']['free'] * 0.94
         buy_amount_item = buy_amount_krw / buy_price
         return buy_price, buy_amount_item, buy_amount_krw
     
