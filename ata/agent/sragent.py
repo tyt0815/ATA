@@ -26,9 +26,9 @@ class SRAgent(BaseAgent):
         # 매도벽
         ask_volume = sum(ask[1] for ask in order_book["asks"])
         if (
-            volume_rise_rate >= 2
-            and price_rise_rate >= 1.01
-            and bid_volume > ask_volume * 2
+            volume_rise_rate >= 4
+            and price_rise_rate >= 1.03
+            and bid_volume > ask_volume * 3
         ):
             return True
         return False
@@ -63,7 +63,7 @@ class SRAgent(BaseAgent):
                     continue
                 ticker = tickers[symbol]
                 percentage = ticker['percentage']
-                if float(ticker['info']['acc_trade_price_24h']) > 5000000000 and percentage > 0:
+                if float(ticker['info']['acc_trade_price_24h']) > 5000000000:
                     buying_candidates.add(symbol.split('/')[0])
         return buying_candidates
     
@@ -83,7 +83,7 @@ class SRAgent(BaseAgent):
         '''
         curr_price = self.exchange.get_current_price(item)
         sell_price = max(curr_price, self.trading_data['buy_price_avg'])
-        sell_price *= 1.03
+        sell_price *= 1.1
         sell_amount_item = self.exchange.balance[item]['free']
         sell_amount_krw = sell_amount_item * sell_price
         return sell_price, sell_amount_item, sell_amount_krw
