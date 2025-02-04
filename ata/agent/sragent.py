@@ -26,30 +26,24 @@ class SRAgent(BaseAgent):
         # 매도벽
         ask_volume = sum(ask[1] for ask in order_book["asks"])
         if (
-            volume_rise_rate >= 4
-            and price_rise_rate >= 1.03
+            volume_rise_rate >= 3
+            and price_rise_rate >= 1.02
             and bid_volume > ask_volume * 3
         ):
             return True
         return False
     
     def _is_sell_timing(self, item) -> bool:
-        return True
-        # now = time.time()
-        # if now - self.trading_data['last_buy_time'] > 30:
-        #     return True
-        # return False
-        
-        # order_book = self.exchange.get_order_book(item)
-        # # 매수벽
-        # bid_volume = sum(bid[1] for bid in order_book["bids"])
-        # # 매도벽
-        # ask_volume = sum(ask[1] for ask in order_book["asks"])
-        # if(
-        #     bid_volume < ask_volume
-        # ):
-        #     return True
-        # return False
+        order_book = self.exchange.get_order_book(item)
+        # 매수벽
+        bid_volume = sum(bid[1] for bid in order_book["bids"])
+        # 매도벽
+        ask_volume = sum(ask[1] for ask in order_book["asks"])
+        if(
+            bid_volume < ask_volume * 1.5
+        ):
+            return True
+        return False
     
     def _get_buying_candidates(self) -> set:
         buying_candidates = set()
@@ -82,11 +76,12 @@ class SRAgent(BaseAgent):
         return sell_price, sell_amount_item, sell_amount_krw
         '''
         curr_price = self.exchange.get_current_price(item)
-        sell_price = max(curr_price, self.trading_data['buy_price_avg'])
-        sell_price *= 1.1
+        # sell_price = max(curr_price, self.trading_data[item]['buy_price_avg'])
+        # sell_price *= 1.1
+        sell_price = curr_price
         sell_amount_item = self.exchange.balance[item]['free']
         sell_amount_krw = sell_amount_item * sell_price
-        return sell_price, sell_amount_item, sell_amount_krw
+        return None, sell_amount_item, sell_amount_krw
     
     def _calc_buy_skip_criterion(self, item) -> int:
         # return np.median(self.trading_data[item]['buy_cnt_histories']) - 1
